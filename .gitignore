@@ -1,0 +1,42 @@
+# --- Зависимости (папки с библиотеками) ---
+node_modules/
+.pnp
+.pnp.js
+
+# --- Файлы сборки и вывода (генерируются автоматически) ---
+build/
+dist/
+.next/
+out/
+*.tsbuildinfo
+
+# --- Переменные окружения (ВАЖНО: скрывает все .env файлы во всех папках) ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# --- Логи и отчеты об ошибках ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# --- Системные файлы Windows и macOS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Настройки редакторов кода (VS Code, WebStorm) ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Временные папки ---
+tmp/
+temp/

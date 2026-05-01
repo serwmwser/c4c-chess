@@ -1,0 +1,308 @@
+:root {
+  --bg: #f8f2e7;
+  --ink: #16211d;
+  --muted: #56625c;
+  --panel: rgba(255, 250, 242, 0.92);
+  --accent: #b6452c;
+  --accent-2: #1c6b52;
+  --line: rgba(22, 33, 29, 0.1);
+  --shadow: 0 24px 60px rgba(22, 33, 29, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background:
+  radial-gradient(circle at top left, rgba(182, 69, 44, 0.2), transparent 35%),
+  radial-gradient(circle at bottom right, rgba(28, 107, 82, 0.18), transparent 30%),
+  var(--bg);
+color: var(--ink);
+font-family: Georgia, "Times New Roman", serif;
+}
+
+body {
+min-height: 100vh;
+}
+
+button,
+a,
+input,
+select {
+transition: transform 160ms ease, opacity 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+button:hover,
+a:hover {
+transform: translateY(-1px);
+}
+
+input,
+select {
+width: 100%;
+border-radius: 16px;
+border: 1px solid var(--line);
+padding: 14px 16px;
+background: rgba(255, 255, 255, 0.74);
+font-size: 1rem;
+color: var(--ink);
+}
+
+label span {
+display: block;
+margin-bottom: 8px;
+font-size: 0.85rem;
+color: var(--muted);
+}
+
+.page-shell {
+width: min(1240px, calc(100vw - 32px));
+margin: 0 auto;
+padding: 40px 0 72px;
+}
+
+.hero-panel,
+.content-grid,
+.app-grid,
+.game-layout,
+.live-meta {
+display: grid;
+gap: 24px;
+}
+
+.hero-panel {
+grid-template-columns: 1.1fr 0.9fr;
+align-items: start;
+margin-bottom: 28px;
+}
+
+.hero-panel-app {
+align-items: stretch;
+}
+
+.content-grid {
+grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-grid {
+grid-template-columns: repeat(2, minmax(0, 1fr));
+align-items: start;
+}
+
+.eyebrow {
+font-size: 0.78rem;
+letter-spacing: 0.18em;
+color: var(--accent);
+}
+
+h1,
+h2,
+strong {
+font-weight: 700;
+}
+
+h1 {
+font-size: clamp(2.6rem, 6vw, 4.7rem);
+line-height: 0.95;
+margin: 12px 0 16px;
+}
+
+h2 {
+font-size: 1.8rem;
+margin: 0;
+}
+
+.hero-copy,
+.stack-list p,
+.profile-metric,
+.status-card,
+.room-card p,
+.auth-gate p {
+color: var(--muted);
+}
+
+.panel,
+.stake-ribbon {
+backdrop-filter: blur(12px);
+background: var(--panel);
+border: 1px solid var(--line);
+border-radius: 28px;
+box-shadow: var(--shadow);
+}
+
+.panel {
+padding: 24px;
+}
+
+.panel-head {
+margin-bottom: 18px;
+}
+
+.compact-panel,
+.room-list-panel,
+.form-panel {
+min-height: 100%;
+}
+
+.stake-ribbon {
+display: grid;
+grid-template-columns: repeat(3, minmax(0, 1fr));
+gap: 16px;
+padding: 16px 20px;
+}
+
+.stake-ribbon span,
+.profile-metric span,
+.status-card span,
+.live-meta span {
+display: block;
+font-size: 0.78rem;
+letter-spacing: 0.08em;
+text-transform: uppercase;
+color: var(--muted);
+}
+
+.stack-list,
+.form-panel {
+display: grid;
+gap: 18px;
+}
+
+.primary-btn,
+.ghost-btn {
+border-radius: 999px;
+padding: 14px 18px;
+font-size: 1rem;
+cursor: pointer;
+}
+
+.primary-btn {
+border: none;
+background: var(--accent);
+color: white;
+}
+
+.primary-btn:disabled {
+opacity: 0.65;
+cursor: wait;
+}
+
+.ghost-btn {
+border: 1px solid var(--line);
+background: transparent;
+}
+
+.profile-panel a {
+color: var(--accent-2);
+}
+
+.profile-metric {
+display: grid;
+gap: 6px;
+padding: 16px 0;
+border-top: 1px solid var(--line);
+}
+
+.wallet-row.single {
+justify-content: flex-start;
+}
+
+.auth-gate {
+display: grid;
+gap: 16px;
+}
+
+.form-error {
+margin: 0;
+color: #9a1f1f;
+}
+
+.room-list {
+display: grid;
+gap: 14px;
+}
+
+.room-card {
+display: flex;
+justify-content: space-between;
+gap: 16px;
+align-items: center;
+padding: 18px;
+border-radius: 22px;
+border: 1px solid var(--line);
+background: rgba(255, 255, 255, 0.45);
+}
+
+.live-panel {
+grid-column: 1 / -1;
+}
+
+.empty-live {
+min-height: 240px;
+}
+
+.live-meta {
+grid-template-columns: repeat(3, minmax(0, 1fr));
+margin-bottom: 20px;
+}
+
+.game-layout {
+grid-template-columns: minmax(0, 540px) minmax(280px, 1fr);
+align-items: start;
+}
+
+.board-wrap {
+width: 100%;
+overflow: auto;
+}
+
+.moves-panel,
+.stake-actions {
+display: grid;
+gap: 14px;
+}
+
+.status-card {
+padding: 18px;
+border-radius: 22px;
+border: 1px solid var(--line);
+background: rgba(255, 255, 255, 0.48);
+}
+
+.stake-button-row {
+display: grid;
+grid-template-columns: repeat(2, minmax(0, 1fr));
+gap: 12px;
+}
+
+@media (max-width: 1000px) {
+.hero-panel,
+.content-grid,
+.app-grid,
+.stake-ribbon,
+.live-meta,
+.game-layout,
+.stake-button-row {
+    grid-template-columns: 1fr;
+  }
+
+  .page-shell {
+    width: min(100vw - 20px, 1240px);
+    padding-top: 20px;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+  }
+
+  .room-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
