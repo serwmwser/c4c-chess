@@ -5,8 +5,9 @@ import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useGameStore } from '@/lib/game-store';
 
+// Интерфейс для пропсов формы
 interface CreateGameFormProps {
-  onCreateGame: (data: any) => void;
+  onCreateGame: (data: any) => Promise<void> | void;
 }
 
 export default function CreateGameForm({ onCreateGame }: CreateGameFormProps) {
@@ -28,28 +29,31 @@ export default function CreateGameForm({ onCreateGame }: CreateGameFormProps) {
     setIsSubmitting(true);
 
     try {
-      // 1. Вызываем функцию создания игры (отправка на сервер или в лобби)
-      const room = await onCreateGame({
+      // 1. Подготавливаем данные
+      const finalStake = matchType === "ranked" ? stakeAmount : 0;
+
+      // 2. Вызываем функцию создания (она может быть асинхронной)
+      await onCreateGame({
         nickname,
         matchType,
-        stakeAmount: matchType === "ranked" ? stakeAmount : 0,
+        stakeAmount: finalStake,
         timeControl,
       });
 
-      // 2. Если комната создана, обновляем стейт вручную, чтобы типы совпадали
-      if (room && room.id) {
-        setActiveRoom({
-          id: room.id,
-          fen: room.fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-          white: address || '',
-          black: '', // Соперник появится позже
-          stake: matchType === "ranked" ? stakeAmount : 0
-        });
-      }
+      // 3. Сразу переходим в режим ожидания игры (так как мы не знаем ID комнаты заранее)
+      // Мы создаем "виртуальную" комнату локально, чтобы интерфейс переключился
+      setActiveRoom({
+        id: 'waiting-for-opponent', // Временный ID
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        white: address || '',
+        black: '',
+        stake: finalStake
+      });
 
     } catch (cause) {
       console.error(cause);
       setError(cause instanceof Error ? cause.message : "Failed to create room");
+      setActiveRoom(null); // Сбрасываем при ошибке
     } finally {
       setIsSubmitting(false);
     }
@@ -131,10 +135,9 @@ export default function CreateGameForm({ onCreateGame }: CreateGameFormProps) {
               : 'bg-blue-600 hover:bg-blue-700'
           }`}
         >
-          {isSubmitting ? 'Создание...' : 'Начать игру'}
+          {isSubmitting ? 'Поиск соперника...' : 'Начать игру'}
         </button>
       </div>
     </form>
   );
 }
-
