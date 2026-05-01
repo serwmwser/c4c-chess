@@ -43,7 +43,7 @@ export function CreateGameForm() {
         wallet: address,
         nickname,
         matchType,
-        stakeAmount: matchType === "stake" ? stakeAmount : 0,
+        stakeAmount: matchType === "ranked" ? stakeAmount : 0, 
         timeControl,
       });
 
