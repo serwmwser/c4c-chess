@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { getSocket } from '@/lib/socket';
 import CreateGameForm from '@/components/create-game-form';
-import RoomList from '@/components/room-list';
+import { RoomList } from '@/components/room-list'; // Исправлено: добавлены фигурные скобки
 import LiveGame from '@/components/live-game';
 import { useGameStore } from '@/lib/game-store';
 
@@ -14,15 +14,25 @@ export default function Home() {
 
   useEffect(() => {
     const socket = getSocket();
-    socket.on('connect', () => setStatus('Подключено ✅'));
-    socket.on('disconnect', () => setStatus('Отключено ❌'));
-    if (!socket.connected) socket.connect();
-    return () => { socket.off('connect'); socket.off('disconnect'); };
+    
+    const handleConnect = () => setStatus('Подключено ✅');
+    const handleDisconnect = () => setStatus('Отключено ❌');
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+    };
   }, []);
 
   const handleCreateGame = async ( any) => {
     console.log("Creating game with:", data);
-    // Здесь должна быть логика отправки на сервер через сокет
     const socket = getSocket();
     socket.emit('createRoom', data);
   };
@@ -32,7 +42,9 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">♟️ C4C Chess</h1>
-          <span className={`px-3 py-1 rounded ${status.includes('✅') ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'}`}>
+          <span className={`px-3 py-1 rounded ${
+            status.includes('✅') ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'
+          }`}>
             {status}
           </span>
         </header>
