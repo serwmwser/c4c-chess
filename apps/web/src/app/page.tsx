@@ -1,4 +1,5 @@
 // apps/web/src/app/page.tsx
+// Force rebuild 2026-05-02
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -15,16 +16,25 @@ export default function Home() {
 
   useEffect(() => {
     const socket = getSocket();
+    
     const handleConnect = () => setStatus('Подключено ✅');
     const handleDisconnect = () => setStatus('Отключено ❌');
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
-    if (!socket.connected) socket.connect();
-    return () => { socket.off('connect', handleConnect); socket.off('disconnect', handleDisconnect); };
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    return () => { 
+      socket.off('connect', handleConnect); 
+      socket.off('disconnect', handleDisconnect); 
+    };
   }, []);
 
-  // Исправлено: добавлено имя параметра data и тип any
   const handleCreateGame = async ( data: any) => {
+    console.log("Creating game with:", data);
     const socket = getSocket();
     socket.emit('createRoom', data);
   };
@@ -34,14 +44,18 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">♟️ C4C Chess</h1>
-          <span className={`px-3 py-1 rounded ${status.includes('✅') ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'}`}>
+          <span className={`px-3 py-1 rounded ${
+            status.includes('✅') ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'
+          }`}>
             {status}
           </span>
         </header>
         
         {!activeRoom && <LobbyPanel />}
 
-        {activeRoom ? <LiveGame /> : (
+        {activeRoom ? (
+          <LiveGame />
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
             <CreateGameForm onCreateGame={handleCreateGame} />
             <RoomList />
