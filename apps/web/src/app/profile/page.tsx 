@@ -1,54 +1,172 @@
-// apps/web/src/app/profile/page.tsx
+// apps/web/src/app/page.tsx
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAccount, useDisconnect } from 'wagmi';
-import { C4C_TOKEN_ADDRESS } from '@/lib/config';
+import { useState } from 'react';
+import { useAccount, useConnect, useDisconnect, useConnectors, useBalance } from 'wagmi';
+import { CONFIG } from '@/lib/config';
+import { Chess } from 'chess.js';
 
-export default function ProfilePage() {
-  const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
-  const router = useRouter();
-
-  // 🔥 Защита: если не подключён → редирект на главную
-  useEffect(() => {
-    if (!isConnected) {
-      router.replace('/');
+// 🔹 КОМПОНЕНТ ШАХМАТНОЙ ДОСКИ (Фаза 3)
+function ChessBoard() {
+  const [game] = useState(() => new Chess());
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
+  
+  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
+  
+  const getPieceSymbol = (piece: { type: string; color: 'w' | 'b' } | null) => {
+    if (!piece) return '';
+    const symbols: Record<string, Record<'w' | 'b', string>> = {
+      p: { w: '♙', b: '♟' }, n: { w: '♘', b: '♞' }, b: { w: '♗', b: '♝' },
+      r: { w: '♖', b: '♜' }, q: { w: '♕', b: '♛' }, k: { w: '♔', b: '♚' },
+    };
+    return symbols[piece.type]?.[piece.color] || '';
+  };
+  
+  const handleSquareClick = (square: string) => {
+    if (selectedSquare === square) { setSelectedSquare(null); setPossibleMoves([]); return; }
+    if (selectedSquare) {
+      try {
+        const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+        if (move) { setSelectedSquare(null); setPossibleMoves([]); return; }
+      } catch (e) {}
     }
-  }, [isConnected, router]);
+    const piece = game.get(square);
+    if (piece && piece.color === game.turn()) {
+      setSelectedSquare(square);
+      const moves = game.moves({ square, verbose: true });
+      setPossibleMoves(moves.map(m => m.to));
+    } else { setSelectedSquare(null); setPossibleMoves([]); }
+  };
+  
+  const getSquareColor = (fi: number, ri: number) => (fi + ri) % 2 === 0 ? '#eeeed2' : '#769656';
+  const isPossibleMove = (sq: string) => possibleMoves.includes(sq);
+  const isSelected = (sq: string) => selectedSquare === sq;
 
-  if (!isConnected || !address) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">
-        Redirecting...
+  return (
+    <div style={{ marginTop: '24px', padding: '20px', background: '#1f2937', borderRadius: '16px', border: '1px solid #374151' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'white' }}>♟️ Игровая доска</h3>
+        <span style={{ fontSize: '14px', color: '#9ca3af' }}>Ход: {game.turn() === 'w' ? '⚪ Белые' : '⚫ Чёрные'}</span>
       </div>
-    );
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '1px', background: '#374151', border: '2px solid #374151', borderRadius: '8px', maxWidth: '400px', margin: '0 auto' }}>
+        {ranks.map((rank, ri) => files.map((file, fi) => {
+          const square = `${file}${rank}`;
+          const piece = game.get(square);
+          const symbol = getPieceSymbol(piece);
+          return (
+            <div key={square} onClick={() => handleSquareClick(square)} style={{
+              aspectRatio: '1', background: getSquareColor(fi, ri), display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: '32px', cursor: piece || isPossibleMove(square) ? 'pointer' : 'default',
+              color: piece ? (piece.color === 'w' ? '#1a1a1a' : 'white') : 'transparent', position: 'relative',
+              border: isSelected(square) ? '3px solid #f59e0b' : isPossibleMove(square) ? '3px solid #3b82f6' : 'none'
+            }}>
+              {symbol}
+              {isPossibleMove(square) && !piece && <div style={{ position: 'absolute', width: '20px', height: '20px', background: 'rgba(59,130,246,0.5)', borderRadius: '50%' }} />}
+            </div>
+          );
+        }))}
+      </div>
+      <div style={{ textAlign: 'center', marginTop: '16px', minHeight: '40px' }}>
+        {game.isCheckmate() && <p style={{ color: '#ef4444', fontWeight: 'bold' }}>♔ Шах и мат! Победили {game.turn() === 'w' ? 'чёрные' : 'белые'}</p>}
+        {game.isDraw() && <p style={{ color: '#f59e0b', fontWeight: 'bold' }}>🤝 Ничья</p>}
+        {game.inCheck() && !game.isCheckmate() && <p style={{ color: '#fbbf24' }}>⚠️ Шах!</p>}
+      </div>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '20px' }}>
+        <button onClick={() => { game.reset(); setSelectedSquare(null); setPossibleMoves([]); }} style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>Новая игра</button>
+      </div>
+    </div>
+  );
+}
+
+// 🔹 ОСНОВНОЙ КОМПОНЕНТ
+export default function App() {
+  const { address, isConnected, chain } = useAccount();
+  const { connect, isPending } = useConnect();
+  const { disconnect } = useDisconnect();
+  const connectors = useConnectors();
+  const [showModal, setShowModal] = useState(false);
+  
+  // 🔥 ИСПРАВЛЕНО: useBalance возвращает { data, status, error }, а не { balance }
+  const { data: balance, status: balanceStatus, error: balanceError } = useBalance({
+    address: address,
+    token: CONFIG.C4C_TOKEN_ADDRESS as `0x${string}`,
+    enabled: !!address && !!chain?.id && chain.id === CONFIG.CHAIN_ID,
+  });
+
+  const metaMaskConnector = connectors.find(c => c.type === 'metaMask');
+  const walletConnectConnector = connectors.find(c => c.type === 'walletConnect');
+  const isWrongNetwork = isConnected && chain?.id !== CONFIG.CHAIN_ID;
+
+  const ConnectModal = () => (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={() => setShowModal(false)}>
+      <div style={{ background: '#1f2937', borderRadius: '16px', padding: '24px', maxWidth: '420px', width: '100%', border: '1px solid #374151' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white' }}>Connect Wallet</h3>
+          <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '24px', cursor: 'pointer' }}>×</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <button onClick={() => { if (metaMaskConnector) { connect({ connector: metaMaskConnector }); setShowModal(false); } }} disabled={isPending || !metaMaskConnector} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: metaMaskConnector ? '#f59e0b' : '#6b7280', color: 'white', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '500', cursor: metaMaskConnector ? 'pointer' : 'not-allowed' }}>
+            <span style={{ fontSize: '20px' }}>🦊</span><span>Connect via Browser (MetaMask)</span>
+          </button>
+          <button onClick={() => { if (walletConnectConnector) { connect({ connector: walletConnectConnector }); setShowModal(false); } }} disabled={isPending || !walletConnectConnector || CONFIG.WALLETCONNECT_PROJECT_ID === 'demo'} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: (walletConnectConnector && CONFIG.WALLETCONNECT_PROJECT_ID !== 'demo') ? '#3b82f6' : '#6b7280', color: 'white', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '500', cursor: (walletConnectConnector && CONFIG.WALLETCONNECT_PROJECT_ID !== 'demo') ? 'pointer' : 'not-allowed' }}>
+            <span style={{ fontSize: '20px' }}>📱</span><span>Connect via QR Code (Mobile)</span>
+          </button>
+        </div>
+        {CONFIG.WALLETCONNECT_PROJECT_ID === 'demo' && <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(251,191,36,0.15)', borderRadius: '8px', border: '1px solid #fbbf24' }}><p style={{ fontSize: '12px', color: '#fbbf24', margin: 0 }}>⚠️ <strong>QR-код отключён в демо-режиме</strong><br/>Получи ключ на <a href="https://cloud.walletconnect.com" target="_blank" style={{ color: '#60a5fa' }}>cloud.walletconnect.com</a></p></div>}
+      </div>
+    </div>
+  );
+
+  if (!isConnected) {
+    return (<>
+      <main style={{ minHeight: '100vh', background: '#111827', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
+        <h1 style={{ fontSize: '36px', marginBottom: '16px', fontWeight: 'bold' }}>♟️ {CONFIG.APP_NAME}</h1>
+        <p style={{ color: '#9ca3af', marginBottom: '40px', maxWidth: '450px', lineHeight: '1.6', fontSize: '18px' }}>{CONFIG.APP_DESCRIPTION}</p>
+        <button onClick={() => setShowModal(true)} style={{ padding: '16px 40px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '20px', fontWeight: 'bold', cursor: 'pointer' }}>🔗 Войти в приложение</button>
+        <p style={{ marginTop: '28px', fontSize: '14px', color: '#6b7280' }}>MetaMask • WalletConnect • Coinbase</p>
+      </main>
+      {showModal && <ConnectModal />}
+    </>);
+  }
+
+  if (isWrongNetwork) {
+    return (<main style={{ minHeight: '100vh', background: '#111827', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
+      <h1 style={{ fontSize: '28px', marginBottom: '20px' }}>⚠️ Неверная сеть</h1>
+      <p style={{ color: '#fbbf24', marginBottom: '24px', maxWidth: '400px' }}>Переключите кошелёк на <strong>{CONFIG.CHAIN_NAME}</strong> (ID: {CONFIG.CHAIN_ID})</p>
+      <button onClick={() => disconnect()} style={{ padding: '12px 28px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px' }}>Отключить кошелёк</button>
+    </main>);
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
-      <div className="max-w-xl mx-auto space-y-6">
-        <div className="flex justify-between items-center pb-4 border-b border-gray-800">
-          <h1 className="text-2xl font-bold">♟️ Profile</h1>
-          <button
-            onClick={() => disconnect()}
-            className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-sm"
-          >
-            Disconnect
-          </button>
-        </div>
-
-        <div className="p-5 bg-gray-800 rounded-xl border border-gray-700">
-          <p className="text-xs text-gray-500 mb-1">Connected Wallet</p>
-          <p className="font-mono text-sm text-green-400 break-all">{address}</p>
-          <p className="text-xs text-gray-500 mt-3 mb-1">Token Address</p>
-          <p className="font-mono text-xs text-blue-400 break-all">{C4C_TOKEN_ADDRESS}</p>
-        </div>
-
-        <div className="p-5 bg-gray-800/50 rounded-xl border border-gray-700 text-center">
-          <p className="text-gray-400">Create Game form coming in Phase 3</p>
-        </div>
+    <main style={{ minHeight: '100vh', background: '#111827', color: 'white', padding: '20px', fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '20px', borderBottom: '1px solid #374151' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>♟️ {CONFIG.APP_NAME}</h1>
+          <button onClick={() => { disconnect(); setShowModal(false); }} style={{ padding: '10px 20px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>Выйти</button>
+        </header>
+        <section style={{ marginTop: '32px', padding: '28px', background: '#1f2937', borderRadius: '16px', border: '1px solid #374151' }}>
+          <h2 style={{ fontSize: '20px', marginBottom: '20px', fontWeight: '600' }}>👤 Профиль</h2>
+          <div style={{ marginBottom: '24px' }}>
+            <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '8px' }}>Адрес кошелька</p>
+            <p style={{ fontFamily: 'monospace', fontSize: '14px', color: '#22c55e', wordBreak: 'break-all', background: '#111827', padding: '12px', borderRadius: '8px', border: '1px solid #374151' }}>{address}</p>
+          </div>
+          {/* 🔥 ИСПРАВЛЕНО: используем balance?.formatted (balance — это data из useBalance) */}
+          <div>
+            <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '8px' }}>Баланс {CONFIG.APP_NAME}</p>
+            <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#f59e0b' }}>
+              {balanceStatus === 'pending' && '⏳ Загрузка...'}
+              {balanceStatus === 'error' && <span style={{ fontSize: '16px', color: '#f87171' }}>❌ Ошибка</span>}
+              {balanceStatus === 'success' && balance?.formatted ? `${parseFloat(balance.formatted).toFixed(2)} C4C` : balanceStatus === 'success' && '0.00 C4C'}
+            </p>
+          </div>
+        </section>
+        <ChessBoard />
+        <footer style={{ marginTop: '48px', paddingTop: '24px', borderTop: '1px solid #374151', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
+          <p>Токен: <span style={{ fontFamily: 'monospace' }}>{CONFIG.C4C_TOKEN_ADDRESS.slice(0, 10)}...{CONFIG.C4C_TOKEN_ADDRESS.slice(-8)}</span></p>
+          <p style={{ marginTop: '8px' }}>Сеть: {CONFIG.CHAIN_NAME} (ID: {CONFIG.CHAIN_ID})</p>
+        </footer>
       </div>
     </main>
   );
