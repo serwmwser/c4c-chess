@@ -13,8 +13,7 @@ interface Room {
 export class MatchService {
   private rooms: Map<string, Room> = new Map();
 
-  // Исправлено: добавлено имя параметра data и его тип
-  createRoom( data: any): Room {
+  createRoom(  any): Room {
     const roomId = uuidv4();
     const room: Room = {
       id: roomId,
@@ -41,7 +40,6 @@ export class MatchService {
   handleMove(roomId: string, move: any, callback: (fen: string) => void) {
     const room = this.rooms.get(roomId);
     if (!room) return;
-    console.log(`Move in room ${roomId}:`, move);
     callback(room.fen); 
   }
 
