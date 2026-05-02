@@ -23,7 +23,8 @@ export default function Home() {
     return () => { socket.off('connect', handleConnect); socket.off('disconnect', handleDisconnect); };
   }, []);
 
-  const handleCreateGame = async ( any) => {
+  // Исправлено: добавлено имя параметра data и тип any
+  const handleCreateGame = async ( data: any) => {
     const socket = getSocket();
     socket.emit('createRoom', data);
   };
