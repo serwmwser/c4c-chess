@@ -13,7 +13,8 @@ interface Room {
 export class MatchService {
   private rooms: Map<string, Room> = new Map();
 
-  createRoom( any): Room {
+  // Исправлено: добавлено имя параметра data и его тип
+  createRoom( data: any): Room {
     const roomId = uuidv4();
     const room: Room = {
       id: roomId,
