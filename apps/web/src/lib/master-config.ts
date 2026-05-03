@@ -10,37 +10,34 @@ import { PATCH_008 } from './config-patch-008';
 import { PATCH_009 } from './config-patch-009';
 import { PATCH_010 } from './config-patch-010';
 import { PATCH_011 } from './config-patch-011';
+import { PATCH_012 } from './config-patch-012';
 
 export const CONFIG = {
   ...CONFIG_BASE,
   ...PATCH_001, ...PATCH_002, ...PATCH_003, ...PATCH_004,
-  ...PATCH_005, ...PATCH_006, ...PATCH_007, ...PATCH_008, ...PATCH_009, ...PATCH_010, ...PATCH_011
+  ...PATCH_005, ...PATCH_006, ...PATCH_007, ...PATCH_008, ...PATCH_009, ...PATCH_010, ...PATCH_011, ...PATCH_012
 };
 
-// 🔹 ЭКСПОРТЫ: Всё, что нужно page.tsx
+// 🔹 ЭКСПОРТЫ
 export const APP_NAME = CONFIG.APP_NAME;
 export const C4C_TOKEN_ADDRESS = CONFIG.C4C_TOKEN_ADDRESS;
+export const GAME_CONTRACT_ADDRESS = CONFIG.GAME_CONTRACT_ADDRESS;
 export const CHAIN_ID = CONFIG.CHAIN_ID;
 export const WALLETCONNECT_PROJECT_ID = CONFIG.WALLETCONNECT_PROJECT_ID;
 export const C4C_BUY_URL = CONFIG.C4C_BUY_URL;
 export const TIME_OPTIONS = CONFIG.TIME_OPTIONS;
 export const STAKE_OPTIONS = CONFIG.STAKE_OPTIONS;
-
-// Фазы 6 (Темы, Языки, Безопасные доски) — через Патч 011
 export const UI_THEMES = CONFIG.UI_THEMES;
 export const UI_LANGS = CONFIG.UI_LANGS;
 export const UI_BOARDS = CONFIG.UI_BOARDS;
 export const UI_TRANSLATE = CONFIG.UI_TRANSLATE;
-
-// Фазы 7 (Игры, Ставки, Ходы) — через Патч 010
 export const VALID_STAKES = CONFIG.VALID_STAKES;
 export const VALID_TIMES = CONFIG.VALID_TIMES;
 export const validateGameConfig = CONFIG.validateGameConfig;
 export const createTokenGameSession = CONFIG.createTokenGameSession;
 export const recordGameMove = CONFIG.recordGameMove;
+export const canRefundGame = CONFIG.canRefundGame;
 export const getMyActiveGames = CONFIG.getMyActiveGames;
-
-// Утилиты и Базовые функции
 export const formatTime = CONFIG.formatTime;
 export const formatC4C = CONFIG.formatC4C;
 export const getBotMove = CONFIG.getBotMove;
@@ -56,3 +53,14 @@ export const getFriends = CONFIG.getFriends;
 export const addFriend = CONFIG.addFriend;
 export const processPayout = CONFIG.processPayout;
 export const getOnlineGames = CONFIG.getOnlineGames;
+
+// 🔹 ФАЗА 8: КОНТРАКТЫ
+export const C4C_ABI = CONFIG.C4C_ABI;
+export const GAME_ABI = CONFIG.GAME_ABI;
+export const toContractUnits = CONFIG.toContractUnits;
+export const useApproveC4C = CONFIG.useApproveC4C;
+export const useCreateGame = CONFIG.useCreateGame;
+export const useJoinGame = CONFIG.useJoinGame;
+export const useClaimWinnings = CONFIG.useClaimWinnings;
+export const useRefundCreator = CONFIG.useRefundCreator;
+export const useSettleDraw = CONFIG.useSettleDraw;
