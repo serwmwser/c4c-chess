@@ -1,6 +1,7 @@
 import{CONFIG_BASE}from'./config-base';
 import{PATCH_001}from'./config-patch-001';
 import{PATCH_002}from'./config-patch-002';
+import{PATCH_003}from'./config-patch-003';
 
 export const CONFIG={
   ...CONFIG_BASE,
@@ -8,7 +9,8 @@ export const CONFIG={
   canConnectToMetaMask:PATCH_001.canConnectToMetaMask,
   canConnectToWalletConnect:PATCH_001.canConnectToWalletConnect,
   resetConnectionStates:PATCH_001.resetConnectionStates,
-  formatC4C:PATCH_002.formatC4C, // 🔥 Переопределяем баланс через патч
+  formatC4C:PATCH_002.formatC4C,
+  ...PATCH_003, // 🔥 Все функции друзей, лобби и выплат
 };
 
 export const{
@@ -19,4 +21,5 @@ export const{
   saveProfileToStorage,loadProfileFromStorage,
   createWagmiConfig,canConnectToMetaMask,canConnectToWalletConnect,resetConnectionStates,
   getPieceStyle,PIECE_SYMBOLS,
+  getOnlineGames,createGameLobby,getFriends,addFriend,sendGameInvite,processPayout
 }=CONFIG;
