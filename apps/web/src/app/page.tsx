@@ -1,4 +1,6 @@
+// apps/web/src/app/page.tsx
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useAccount, useConnect, useDisconnect, useConnectors, useBalance, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseAbi } from 'viem';
