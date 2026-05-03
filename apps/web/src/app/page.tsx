@@ -14,7 +14,9 @@ import { FriendsList } from '@/components/friends-list';
 import { ProfileEditor } from '@/components/profile-editor';
 import { ClaimWinnings } from '@/components/claim-winnings';
 import { useGameStore } from '@/lib/game-store';
-import { STAKE_OPTIONS, formatC4C } from '@/lib/utils';
+import { formatC4C } from '@/lib/utils';
+// 🔥 ИСПРАВЛЕНО: STAKE_OPTIONS импортируется из @/types
+import { STAKE_OPTIONS } from '@/types';
 
 const CHESS_GAME_ABI = parseAbi(["function makeMove(string gameId, string moveNotation) external"]);
 
