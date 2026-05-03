@@ -7,7 +7,7 @@ import {
   TIME_OPTIONS, STAKE_OPTIONS,
   formatTime, formatC4C, getBotMove, saveProfileToStorage, loadProfileFromStorage,
   resetConnectionStates, getOnlineGames, createGameLobby, getFriends, addFriend, processPayout,
-  FIXED_CSS, injectGlobalStyles
+  FIXED_CSS, injectGlobalStyles, SAFE_BOARD_THEMES
 } from '@/lib/config'
 
 const BRIGHT_THEMES: any = {
@@ -19,13 +19,6 @@ const BRIGHT_THEMES: any = {
   peach: { bg: '#ffd1ff', text: '#2d3436', accent: '#e91e63', card: '#f8bbd0' },
   lime: { bg: '#d4fc79', text: '#2d3436', accent: '#2ecc71', card: '#c8e6c9' },
   violet: { bg: '#fa709a', text: '#fff', accent: '#9b59b6', card: '#e1bee7' }
-}
-
-const CHESS_BOARD: any = {
-  blue: { light: '#eeeed2', dark: '#769656' },
-  brown: { light: '#f0d9b5', dark: '#b58863' },
-  green: { light: '#ffffdd', dark: '#86a665' },
-  grey: { light: '#c9c9c9', dark: '#7a7a7a' }
 }
 
 const PIECES: any = { p:{w:'♙',b:'♟'}, n:{w:'♘',b:'♞'}, b:{w:'♗',b:'♝'}, r:{w:'♖',b:'♜'}, q:{w:'♕',b:'♛'}, k:{w:'♔',b:'♚'} }
@@ -56,11 +49,7 @@ export default function Page() {
   const balanceResult = useBalance({ address, token: C4C_TOKEN_ADDRESS as `0x${string}`, query: { enabled: !!address && !!chain?.id && chain.id === CHAIN_ID } })
   const balance = balanceResult.data
 
-  // 🔥 Инъекция исправленных стилей (обход битого globals.css)
-  useEffect(() => {
-    if (isClient && FIXED_CSS) injectGlobalStyles(FIXED_CSS)
-  }, [isClient])
-
+  useEffect(() => { if (isClient && FIXED_CSS) injectGlobalStyles(FIXED_CSS) }, [isClient])
   useEffect(() => { setIsClient(true)
     const saved = loadProfileFromStorage()
     if (saved && address) setProfile({ ...saved, id: address })
@@ -153,7 +142,7 @@ export default function Page() {
           <label style={{fontSize:12,opacity:.7}}>🎨 Тема</label>
           <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{Object.entries(BRIGHT_THEMES).map(([id,t]:any)=>(<button key={id} onClick={()=>updateProfile({theme:id})} style={{flex:1,padding:6,borderRadius:6,background:t.bg,color:t.text,border:profile.theme===id?'3px solid var(--accent)':'1px solid var(--border)'}}>{(t as any).name||id}</button>))}</div>
           <label style={{fontSize:12,opacity:.7}}>♟️ Доска</label>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{Object.entries(CHESS_BOARD).map(([id,t]:any)=>(<button key={id} onClick={()=>updateProfile({boardTheme:id})} style={{width:36,height:20,borderRadius:4,background:`linear-gradient(135deg,${(t as any).light},${(t as any).dark}`,border:profile.boardTheme===id?'3px solid var(--accent)':'1px solid var(--border)'}} title={id}/>))}</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{Object.entries(SAFE_BOARD_THEMES).map(([id,t]:any)=>(<button key={id} onClick={()=>updateProfile({boardTheme:id})} style={{width:36,height:20,borderRadius:4,background:`linear-gradient(135deg,${t.light},${t.dark}`,border:profile.boardTheme===id?'3px solid var(--accent)':'1px solid var(--border)'}} title={id}/>))}</div>
         </div>
       </div>}
       {tab==='lobby' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
@@ -172,7 +161,10 @@ export default function Page() {
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:0,maxWidth:360,margin:'0 auto',borderRadius:8,overflow:'hidden',boxShadow:'0 4px 12px rgba(0,0,0,.4)'}}>
           {['8','7','6','5','4','3','2','1'].map((r,ri)=>['a','b','c','d','e','f','g','h'].map((f,fi)=>{
-            const sq=f+r; const p=g.get(sq as any); const t=CHESS_BOARD[profile.boardTheme]; const bg=(fi+ri)%2===0 ? t.light : t.dark
+            const sq=f+r; const p=g.get(sq as any); 
+            // 🔥 Берёт цвета ТОЛЬКО из Патча 007 (через master-config)
+            const t = (SAFE_BOARD_THEMES as any)[profile.boardTheme] || SAFE_BOARD_THEMES.blue;
+            const bg=(fi+ri)%2===0 ? t.light : t.dark
             return <div key={sq} onClick={()=>click(sq)} style={{aspectRatio:1,background:bg,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',border:selected===sq?'3px solid #fdcb6e':'none'}}>
               {fi===0 && <span style={{position:'absolute',top:2,left:4,fontSize:10,fontWeight:700,color:(fi+ri)%2===0?t.dark:t.light,opacity:.7,pointerEvents:'none'}}>{r}</span>}
               {ri===7 && <span style={{position:'absolute',bottom:2,right:4,fontSize:10,fontWeight:700,color:(fi+ri)%2===0?t.dark:t.light,opacity:.7,pointerEvents:'none'}}>{f}</span>}

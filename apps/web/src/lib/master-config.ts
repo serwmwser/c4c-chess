@@ -5,8 +5,8 @@ import { PATCH_003 } from './config-patch-003';
 import { PATCH_004 } from './config-patch-004';
 import { PATCH_005 } from './config-patch-005';
 import { PATCH_006 } from './config-patch-006';
+import { PATCH_007 } from './config-patch-007'; // 🔥 Новый патч
 
-// 🔹 КОНСТРУКТОР: Собираем всё в один объект CONFIG
 export const CONFIG = {
   ...CONFIG_BASE,
   ...PATCH_001,
@@ -15,6 +15,7 @@ export const CONFIG = {
   ...PATCH_004,
   ...PATCH_005,
   ...PATCH_006,
+  ...PATCH_007
 };
 
 // 🔹 ЭКСПОРТ: Отдаем все детали приложению
@@ -57,3 +58,4 @@ export const FIXED_CSS = CONFIG.FIXED_CSS;
 export const injectGlobalStyles = CONFIG.injectGlobalStyles;
 export const GLOBAL_THEME_STYLES = CONFIG.GLOBAL_THEME_STYLES;
 export const applyThemeCoordinator = CONFIG.applyThemeCoordinator;
+export const SAFE_BOARD_THEMES = CONFIG.SAFE_BOARD_THEMES; // 🔥 Экспорт для page.tsx
