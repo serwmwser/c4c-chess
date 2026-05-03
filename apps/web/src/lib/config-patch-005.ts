@@ -1,0 +1,10 @@
+export const FIXED_CSS = "*{box-sizing:border-box;padding:0;margin:0}:root{--bg:#1a1a2e;--text:#f0f0f0;--accent:#fdcb6e;--card:#16213e;--border:#0f3460;--success:#00b894;--error:#e94560;--warning:#fdcb6e}html,body{max-width:100vw;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;transition:background .3s,color .3s}button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;transition:all .2s;background:var(--accent);color:#000;padding:10px 20px;font-weight:600}button:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px)}button:disabled{opacity:.5;cursor:not-allowed}input,select,textarea{font-family:inherit;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;width:100%;transition:border .2s}input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}[data-theme='sunny']{--bg:#ffecd2;--text:#2d3436;--accent:#fdcb6e;--card:#fff9c4;--border:#ffeaa7}[data-theme='coral']{--bg:#ff9a9e;--text:#fff;--accent:#ff6b6b;--card:#ffb3ba;--border:#ff7675}[data-theme='mint']{--bg:#a8e6cf;--text:#2d3436;--accent:#00b894;--card:#dcedc1;--border:#81ecec}[data-theme='sky']{--bg:#89f7fe;--text:#2d3436;--accent:#3498db;--card:#bae8e8;--border:#74b9ff}[data-theme='lavender']{--bg:#e0c3fc;--text:#2d3436;--accent:#8e44ad;--card:#f3e5f5;--border:#d1c4e9}[data-theme='peach']{--bg:#ffd1ff;--text:#2d3436;--accent:#e91e63;--card:#f8bbd0;--border:#f48fb1}[data-theme='lime']{--bg:#d4fc79;--text:#2d3436;--accent:#2ecc71;--card:#c8e6c9;--border:#a5d6a7}[data-theme='violet']{--bg:#fa709a;--text:#fff;--accent:#9b59b6;--card:#e1bee7;--border:#f3e5f5}";
+
+export function injectGlobalStyles(css: string) {
+  if (typeof document === 'undefined') return;
+  let style = document.getElementById('c4c-patch-styles');
+  if (!style) { style = document.createElement('style'); style.id = 'c4c-patch-styles'; document.head.appendChild(style); }
+  style.textContent = css;
+}
+
+export const PATCH_005 = { FIXED_CSS, injectGlobalStyles };
