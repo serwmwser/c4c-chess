@@ -23,7 +23,7 @@ export interface PlayerProfile{id:string;name:string;theme:ProfileThemeId;langua
 export interface Game{id:string;creatorId:string;status:string;[key:string]:any;}
 export interface Friend{id:string;name:string;[key:string]:any;}
 export interface GameInvite{id:string;gameId:string;fromPlayer:string;toPlayer:string;status:"pending"|"accepted"|"declined";createdAt:number;}
-export function createWagmiConfigBase(){return createConfig({chains:[bsc],connectors:[metaMask({dappMetadata:{name:APP_NAME,url:'https://c4c-chess.vercel.app'}}),walletConnect({projectId:WALLETCONNECT_PROJECT_ID,showQrModal:true,meta:{name:APP_NAME,description:APP_DESCRIPTION,url:'https://c4c-chess.vercel.app',icons:[]}}),],transports:{[bsc.id]:http(RPC_URL)},});}
+export function createWagmiConfigBase(){return createConfig({chains:[bsc],connectors:[metaMask({dappMetadata:{name:APP_NAME,url:'https://c4c-chess.vercel.app'}}),walletConnect({projectId:WALLETCONNECT_PROJECT_ID,showQrModal:true,metadata:{name:APP_NAME,description:APP_DESCRIPTION,url:'https://c4c-chess.vercel.app',icons:[]}}),],transports:{[bsc.id]:http(RPC_URL)},});}
 export function canConnectMetaBase():boolean{return true;}
 export function canConnectWCBase():boolean{return true;}
 export function resetConnBase(){}
