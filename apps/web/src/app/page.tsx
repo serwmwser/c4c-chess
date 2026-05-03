@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount, useConnect, useDisconnect, useConnectors, useBalance } from 'wagmi';
+import { Chess } from 'chess.js';
 import { CONFIG } from '@/lib/config';
 
 export default function App() {
@@ -12,8 +13,9 @@ export default function App() {
   const connectors = useConnectors();
   const [showModal, setShowModal] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   
-  // 🔥 100% НАДЁЖНО: используем результат хука напрямую, без алиасов
+  // 🔥 Баланс: используем .data напрямую (без алиасов)
   const balanceResult = useBalance({
     address: address,
     token: CONFIG.C4C_TOKEN_ADDRESS as `0x${string}`,
@@ -22,19 +24,26 @@ export default function App() {
   const balance = balanceResult.data;
   const balanceStatus = balanceResult.status;
 
-  // 🔥 Определяем клиентский рендер (предотвращаем гидратацию)
+  // 🔥 Клиентский рендер (предотвращаем гидратацию)
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // 🔥 Защита от дублирования запросов подключения
-  const handleConnect = (connector: any) => {
-    if (isPending) return;
-    connect({ connector });
-    setShowModal(false);
+  // 🔥 Подключение с защитой от дублей
+  const handleConnect = async (connector: any) => {
+    if (isPending || isConnecting) return;
+    setIsConnecting(true);
+    try {
+      await connect({ connector });
+      setShowModal(false);
+    } catch (error) {
+      console.error('Connect error:', error);
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
-  // 🔥 Пока не клиент — заглушка
+  // 🔥 Заглушка до загрузки клиента
   if (!isClient) {
     return (
       <main style={{ minHeight: '100vh', background: '#111827', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -43,7 +52,7 @@ export default function App() {
     );
   }
 
-  // 🔥 НЕ ПОДКЛЮЧЁН → кнопка "Войти"
+  // 🔥 НЕ ПОДКЛЮЧЁН → экран входа
   if (!isConnected) {
     return (
       <main style={{ minHeight: '100vh', background: '#111827', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
@@ -52,19 +61,19 @@ export default function App() {
         
         <button 
           onClick={() => setShowModal(true)}
-          disabled={isPending}
+          disabled={isPending || isConnecting}
           style={{ 
             padding: '16px 40px', 
-            background: isPending ? '#6b7280' : '#f59e0b', 
+            background: (isPending || isConnecting) ? '#6b7280' : '#f59e0b', 
             color: 'white', 
             border: 'none', 
             borderRadius: '12px', 
             fontSize: '20px', 
             fontWeight: 'bold', 
-            cursor: isPending ? 'not-allowed' : 'pointer' 
+            cursor: (isPending || isConnecting) ? 'not-allowed' : 'pointer' 
           }}
         >
-          {isPending ? '⏳ Подключение...' : '🔗 Войти в приложение'}
+          {(isPending || isConnecting) ? '⏳ Подключение...' : '🔗 Войти в приложение'}
         </button>
 
         {showModal && (
@@ -76,7 +85,8 @@ export default function App() {
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center', 
-              zIndex: 1000 
+              zIndex: 1000,
+              padding: '20px'
             }} 
             onClick={() => setShowModal(false)}
           >
@@ -93,12 +103,13 @@ export default function App() {
             >
               <h3 style={{ color: 'white', marginBottom: '20px', textAlign: 'center' }}>Выберите кошелёк</h3>
               
+              {/* MetaMask кнопка */}
               <button
                 onClick={() => {
-                  const mm = connectors.find(c => c.type === 'metaMask');
+                  const mm = connectors.find((c: any) => c.type === 'metaMask' || c.id === 'io.metamask');
                   if (mm) handleConnect(mm);
                 }}
-                disabled={isPending}
+                disabled={isPending || isConnecting}
                 style={{
                   width: '100%',
                   padding: '14px',
@@ -109,7 +120,7 @@ export default function App() {
                   borderRadius: '10px',
                   fontSize: '16px',
                   fontWeight: '600',
-                  cursor: isPending ? 'not-allowed' : 'pointer',
+                  cursor: (isPending || isConnecting) ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -119,12 +130,13 @@ export default function App() {
                 🦊 MetaMask
               </button>
               
+              {/* WalletConnect QR кнопка */}
               <button
                 onClick={() => {
-                  const wc = connectors.find(c => c.type === 'walletConnect');
+                  const wc = connectors.find((c: any) => c.type === 'walletConnect');
                   if (wc) handleConnect(wc);
                 }}
-                disabled={isPending || CONFIG.WALLETCONNECT_PROJECT_ID === 'demo'}
+                disabled={isPending || isConnecting || CONFIG.WALLETCONNECT_PROJECT_ID === 'demo'}
                 style={{
                   width: '100%',
                   padding: '14px',
@@ -135,7 +147,7 @@ export default function App() {
                   borderRadius: '10px',
                   fontSize: '16px',
                   fontWeight: '600',
-                  cursor: (CONFIG.WALLETCONNECT_PROJECT_ID !== 'demo' && !isPending) ? 'pointer' : 'not-allowed',
+                  cursor: (CONFIG.WALLETCONNECT_PROJECT_ID !== 'demo' && !isPending && !isConnecting) ? 'pointer' : 'not-allowed',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -147,7 +159,7 @@ export default function App() {
               
               {CONFIG.WALLETCONNECT_PROJECT_ID === 'demo' && (
                 <p style={{ fontSize: '12px', color: '#fbbf24', textAlign: 'center', marginTop: '12px' }}>
-                  ⚠️ QR не работает с ключом 'demo'
+                  ⚠️ QR не работает с ключом 'demo'. Получите ключ на cloud.walletconnect.com
                 </p>
               )}
               
@@ -173,10 +185,11 @@ export default function App() {
     );
   }
 
-  // 🔥 ПОДКЛЮЧЁН → профиль
+  // 🔥 ПОДКЛЮЧЁН → профиль с доской
   return (
     <main style={{ minHeight: '100vh', background: '#111827', color: 'white', padding: '20px' }}>
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        {/* Хедер */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '20px', borderBottom: '1px solid #374151' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>♟️ {CONFIG.APP_NAME}</h1>
           <button 
@@ -187,6 +200,7 @@ export default function App() {
           </button>
         </header>
 
+        {/* Профиль */}
         <section style={{ marginTop: '32px', padding: '28px', background: '#1f2937', borderRadius: '16px', border: '1px solid #374151' }}>
           <h2 style={{ fontSize: '20px', marginBottom: '20px', fontWeight: 600 }}>👤 Профиль</h2>
           
@@ -205,8 +219,46 @@ export default function App() {
           </p>
         </section>
 
+        {/* Шахматная доска (демо) */}
+        <section style={{ marginTop: '32px', padding: '20px', background: '#1f2937', borderRadius: '16px', border: '1px solid #374151' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', textAlign: 'center' }}>♟️ Игровая доска</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '2px', background: '#374151', borderRadius: '8px', maxWidth: '320px', margin: '0 auto' }}>
+            {Array.from({ length: 64 }).map((_, i) => {
+              const fi = i % 8;
+              const ri = Math.floor(i / 8);
+              const bg = (fi + ri) % 2 === 0 ? '#eeeed2' : '#769656';
+              // Простые фигуры для демо
+              const piece = (ri === 1 || ri === 6) ? (ri === 1 ? '♟' : '♙') : 
+                           (ri === 0 || ri === 7) ? ['♜','♞','♝','♛','♚','♝','♞','♜'][fi] : '';
+              const color = piece && (ri < 3 ? '#111827' : '#ffffff');
+              return (
+                <div 
+                  key={i} 
+                  style={{ 
+                    aspectRatio: '1', 
+                    background: bg, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '24px',
+                    color: color,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {piece}
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ marginTop: '16px', color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}>
+            🎮 Полная интерактивная доска — после настройки смарт-контракта
+          </p>
+        </section>
+
+        {/* Футер */}
         <footer style={{ marginTop: '48px', paddingTop: '24px', borderTop: '1px solid #374151', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
           <p>Сеть: {CONFIG.CHAIN_NAME} (ID: {CONFIG.CHAIN_ID})</p>
+          <p style={{ marginTop: '4px' }}>Токен: {CONFIG.C4C_TOKEN_ADDRESS.slice(0, 10)}...{CONFIG.C4C_TOKEN_ADDRESS.slice(-8)}</p>
         </footer>
       </div>
     </main>

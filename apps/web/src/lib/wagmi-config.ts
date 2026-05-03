@@ -8,12 +8,17 @@ export const config = createConfig({
   chains: [bsc],
   connectors: [
     // 🔹 MetaMask (браузерное расширение)
-    metaMask(),
+    metaMask({
+      dappMetadata: {
+        name: CONFIG.APP_NAME,
+        url: typeof window !== 'undefined' ? window.location.origin : 'https://c4c-chess.vercel.app',
+      },
+    }),
     // 🔹 WalletConnect (QR-код для мобильных)
     walletConnect({ 
       projectId: CONFIG.WALLETCONNECT_PROJECT_ID,
       showQrModal: true,
-      metadata: {
+      meta {
         name: CONFIG.APP_NAME,
         description: CONFIG.APP_DESCRIPTION,
         url: typeof window !== 'undefined' ? window.location.origin : 'https://c4c-chess.vercel.app',
