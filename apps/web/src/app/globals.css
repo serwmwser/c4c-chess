@@ -1,7 +1,100 @@
+/* apps/web/src/app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --theme-bg: #111827;
+  --theme-text: #f9fafb;
+  --theme-accent: #f59e0b;
+}
+
+[data-theme='dark'] {
+  --theme-bg: #030712;
+  --theme-text: #f3f4f6;
+  --theme-accent: #6366f1;
+}
+
+[data-theme='light'] {
+  --theme-bg: #f9fafb;
+  --theme-text: #111827;
+  --theme-accent: #059669;
+}
+
+[data-theme='ocean'] {
+  --theme-bg: #0c4a6e;
+  --theme-text: #f0f9ff;
+  --theme-accent: #38bdf8;
+}
+
+[data-theme='forest'] {
+  --theme-bg: #064e3b;
+  --theme-text: #ecfdf5;
+  --theme-accent: #34d399;
+}
+
+[data-theme='sunset'] {
+  --theme-bg: #7c2d12;
+  --theme-text: #fff7ed;
+  --theme-accent: #fb923c;
+}
+
+[data-theme='cyber'] {
+  --theme-bg: #0f0f23;
+  --theme-text: #e0e7ff;
+  --theme-accent: #a78bfa;
+}
+
+[data-theme='royal'] {
+  --theme-bg: #1e1b4b;
+  --theme-text: #fef3c7;
+  --theme-accent: #fbbf24;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
 body {
-  @apply bg-gray-900 text-white min-h-screen;
+  max-width: 100vw;
+  overflow-x: hidden;
+  background: var(--theme-bg);
+  color: var(--theme-text);
+  transition: background 0.3s, color 0.3s;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Скроллбар */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }

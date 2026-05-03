@@ -7,17 +7,21 @@ import { CONFIG } from './config';
 export const config = createConfig({
   chains: [bsc],
   connectors: [
+    // 🔹 MetaMask (браузерное расширение)
     metaMask(),
+    // 🔹 WalletConnect (QR-код для мобильных)
     walletConnect({ 
       projectId: CONFIG.WALLETCONNECT_PROJECT_ID,
       showQrModal: true,
-      metadata: { // ✅ ИСПРАВЛЕНО: было meta {, стало metadata: {
+      metadata: {
         name: CONFIG.APP_NAME,
         description: CONFIG.APP_DESCRIPTION,
-        url: 'https://c4c-chess.vercel.app',
+        url: typeof window !== 'undefined' ? window.location.origin : 'https://c4c-chess.vercel.app',
         icons: ['https://avatars.githubusercontent.com/u/37784886'],
       },
     }),
   ],
-  transports: { [bsc.id]: http(CONFIG.RPC_URL) },
+  transports: {
+    [bsc.id]: http(CONFIG.RPC_URL),
+  },
 });
