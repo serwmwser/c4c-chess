@@ -2,7 +2,7 @@
 import{useState,useEffect}from'react';
 import{useAccount,useConnect,useDisconnect,useConnectors,useBalance}from'wagmi';
 import{Chess}from'chess.js';
-import{C4C_TOKEN_ADDRESS,CHAIN_ID,APP_NAME,APP_DESCRIPTION,WALLETCONNECT_PROJECT_ID,C4C_BUY_URL,TIME_OPTIONS,STAKE_OPTIONS,BOARD_THEMES,formatTime,formatC4C,getBotMove,getPieceStyle,PIECE_SYMBOLS,canConnectToMetaMask,canConnectToWalletConnect,resetConnectionStates,type BoardThemeId,type PlayerProfile}from'@/lib/config';
+import{C4C_TOKEN_ADDRESS,CHAIN_ID,APP_NAME,APP_DESCRIPTION,WALLETCONNECT_PROJECT_ID,C4C_BUY_URL,TIME_OPTIONS,STAKE_OPTIONS,BOARD_THEMES,formatTime,formatC4C,getBotMove,PIECE_SYMBOLS,canConnectToMetaMask,canConnectToWalletConnect,resetConnectionStates,type BoardThemeId}from'@/lib/config';
 
 function getPieceColor(c:'white'|'black'){return c==='white'?'#fff':'#111';}
 
@@ -54,11 +54,7 @@ function ChessApp(){
   const g=new Chess(fen);
   const isW=g.turn()==='w';
   
-  // 🔥 Безопасное получение символа фигуры
-  const getPieceSymbol=(p:any)=>{
-    if(!p||!p.type||!p.color)return'';
-    return PIECE_SYMBOLS[p.type]?.[p.color]||'';
-  };
+  const getPieceSymbol=(p:any)=>{if(!p||!p.type||!p.color)return'';return(PIECE_SYMBOLS as any)[p.type]?.[p.color]||'';};
   
   if(!isClient)return<main style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)',display:'flex',alignItems:'center',justifyContent:'center'}}><p>⏳ Загрузка...</p></main>;
   
@@ -101,12 +97,7 @@ function ChessApp(){
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:2,background:'var(--border)',borderRadius:8,maxWidth:320,margin:'0 auto'}}>
           {['8','7','6','5','4','3','2','1'].map((r,ri)=>['a','b','c','d','e','f','g','h'].map((f,fi)=>{
-            const sq=`${f}${r}`as any;
-            const p=g.get(sq);
-            const theme=BOARD_THEMES[boardTheme];
-            const bg=(fi+ri)%2===0?theme.light:theme.dark;
-            const pc=p?.color==='w'?'white':'black';
-            const sym=getPieceSymbol(p);
+            const sq=`${f}${r}`as any;const p=g.get(sq);const theme=BOARD_THEMES[boardTheme];const bg=(fi+ri)%2===0?theme.light:theme.dark;const pc=p?.color==='w'?'white':'black';const sym=getPieceSymbol(p);
             return(<div key={sq}onClick={()=>click(sq)}style={{aspectRatio:1,background:bg,display:'flex',alignItems:'center',justifyContent:'center',cursor:p?'pointer':'default',fontSize:40,color:getPieceColor(pc),position:'relative',border:selected===sq?'3px solid var(--accent)':'none'}}>{sym}</div>);
           }))}
         </div>
