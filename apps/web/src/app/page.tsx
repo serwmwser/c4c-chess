@@ -13,7 +13,8 @@ import {
   GAME_BALANCE_WINDOW_TITLE, GAME_BALANCE_JOIN_BUTTON, GAME_BALANCE_CREATE_BUTTON, GAME_BALANCE_INVITE_BUTTON,
   createGameWithStake, joinGameWithStake, useGameBalanceManager, publishGameToLobbyExtended,
   getLobbyGamesExtended, generateGameInviteExtended, sendInviteToChatExtended, canJoinGameExtended,
-  initClockExtended, tickClockExtended, makeMoveExtended, checkTimeWin, processTimeWin
+  initClockExtended, tickClockExtended, makeMoveExtended, checkTimeWin, processTimeWin,
+  SECTIONS, YOUTUBE_URL, YOUTUBE_BUTTON_TEXT, C4C_EXCHANGE_URL, SOCIAL_SECTION_TITLE, SOCIAL_LINKS, YOUTUBE_SECTION_DESCRIPTION
 } from '@/lib/config'
 
 const PIECES: any = { p:{w:'♙',b:'♟'}, n:{w:'♘',b:'♞'}, b:{w:'♗',b:'♝'}, r:{w:'♖',b:'♜'}, q:{w:'♕',b:'♛'}, k:{w:'♔',b:'♚'} }
@@ -114,11 +115,13 @@ export default function Page() {
   const handleJoinGame = async (g: any) => {
     if (!address) return alert('🔗 Подключи кошелёк');
     if (!canJoinGameExtended(g, address)) return alert('❌ Нельзя присоединиться');
+    const gameId = g.gameId || g.id;
+    if (!gameId) return alert('❌ Неверный идентификатор игры');
     if (!confirm(`Присоединиться? Ставка: ${formatC4C(g.stake)} C4C`)) return;
     try { 
-      await approve(g.stake); await joinOnChain(g.id); 
-      joinGameWithStake(g.gameId, g.stake, address);
-      updateBalance(g.currentBalance + g.stake);
+      await approve(g.stake); await joinOnChain(gameId); 
+      joinGameWithStake(gameId, g.stake, address);
+      updateBalance((g.currentBalance || 0) + g.stake);
       setGames(getLobbyGamesExtended()); alert('✅ Вы в игре!'); 
     } 
     catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
@@ -165,12 +168,24 @@ export default function Page() {
 
   return <div style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)',padding:20}}>
     <div style={{maxWidth:700,margin:'0 auto'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <h1 style={{display:'flex',alignItems:'center',gap:8}}>{profile.avatar ? <img src={profile.avatar} style={{width:32,height:32,borderRadius:'50%',border:'2px solid var(--accent)'}}/> : '♟️'} {APP_NAME}</h1>
-        <button onClick={()=>disconnect()} style={{background:'var(--error)',padding:'8px 16px',borderRadius:6,color:'#fff'}}>Выйти</button>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:20}}>{profile.avatar ? <img src={profile.avatar} style={{width:32,height:32,borderRadius:'50%',border:'2px solid var(--accent)'}}/> : '♟️'}</span>
+          <div>
+            <div style={{fontSize:22,fontWeight:700}}>{APP_NAME}</div>
+            {address && <div style={{fontSize:13,opacity:.8,marginTop:4}}>Адрес: <span style={{fontFamily:'monospace'}}>{address}</span></div>}
+            {balance?.value && <div style={{fontSize:13,opacity:.8}}>Баланс C4C: <strong>{formatC4C(balance.value)} C4C</strong></div>}
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <a href={C4C_BUY_URL} target="_blank" rel="noopener noreferrer" style={{background:'#10b981',color:'#fff',padding:'8px 16px',borderRadius:6,textDecoration:'none',fontWeight:600}}>Купить C4C</a>
+          <a href={C4C_EXCHANGE_URL} target="_blank" rel="noopener noreferrer" style={{background:'#2563eb',color:'#fff',padding:'8px 16px',borderRadius:6,textDecoration:'none',fontWeight:600}}>Обмен C4C</a>
+          <a href={YOUTUBE_URL} target="_blank" rel="noopener noreferrer" style={{background:'#ff0000',color:'#fff',padding:'8px 16px',borderRadius:6,textDecoration:'none',fontWeight:600}}>{YOUTUBE_BUTTON_TEXT}</a>
+          <button onClick={()=>disconnect()} style={{background:'var(--error)',padding:'8px 16px',borderRadius:6,color:'#fff'}}>Выйти</button>
+        </div>
       </div>
-      <div style={{display:'flex',gap:8,marginBottom:16}}>
-        {['profile','lobby','friends'].map(t=><button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:10,background:tab===t?'var(--accent)':'var(--card)',borderRadius:8,color:tab===t?'#000':'var(--text)'}}>{t==='profile'?'👤 Профиль':t==='lobby'?'🎲 Лобби':'👥 Друзья'}</button>)}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:16}}>
+        {SECTIONS.map((section:any)=><button key={section.key} onClick={()=>setTab(section.key)} style={{padding:10,background:tab===section.key?'var(--accent)':'var(--card)',borderRadius:8,color:tab===section.key?'#000':'var(--text)'}}>{section.label}</button>)}
       </div>
 
       {tab==='profile' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
@@ -186,6 +201,24 @@ export default function Page() {
           </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:4}}>
+          <div><label style={{fontSize:12,opacity:.7}}>🌍 Язык</label>
+            <select value={profile.lang} onChange={(e:any)=>updateProfile({lang:e.target.value})} style={{width:'100%',padding:8,marginTop:4,borderRadius:6}}>
+              {Object.values(UI_LANGS).map((lang:any)=><option key={lang.name} value={lang.name}>{lang.name}</option>)}
+            </select>
+          </div>
+          <div><label style={{fontSize:12,opacity:.7}}>🎨 Тема</label>
+            <select value={profile.theme} onChange={(e:any)=>updateProfile({theme:e.target.value})} style={{width:'100%',padding:8,marginTop:4,borderRadius:6}}>
+              {Object.keys(UI_THEMES).map((theme:any)=><option key={theme} value={theme}>{theme}</option>)}
+            </select>
+          </div>
+        </div>
+        <p style={{fontSize:14,marginTop:12}}>Описание профиля:</p>
+        <textarea value={profile.description} onChange={(e:any)=>updateProfile({description:e.target.value})} rows={4} style={{width:'100%',padding:12,borderRadius:10,marginTop:6}} placeholder="Расскажите о себе..." />
+      </div>}
+
+      {tab==='create' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
+        <h3 style={{marginBottom:12}}>🎮 Создать игру</h3>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
           <div><label style={{fontSize:12,opacity:.7}}>⏱️ Время</label>
             <select value={timeCtrl} onChange={(e:any)=>setTimeCtrl(Number(e.target.value))} style={{width:'100%',padding:8,marginTop:4,borderRadius:6}}>
               {TIME_OPTIONS.map((o:any)=><option key={o.value} value={o.value}>{o.label}</option>)}
@@ -197,10 +230,25 @@ export default function Page() {
             </select>
           </div>
         </div>
-        <p style={{fontSize:14,marginTop:8}}>🏆 Призовой фонд: <span style={{color:'var(--accent)'}}>{formatPrizePool(stake)}</span></p>
-        <button onClick={handleCreateGame} disabled={appPending || crePending} style={{width:'100%',padding:12,marginTop:8,background:'var(--success)',color:'#fff',borderRadius:8,fontWeight:600}}>
+        <p style={{fontSize:14,marginBottom:16}}>🏆 Призовой фонд: <span style={{color:'var(--accent)'}}>{formatPrizePool(stake)}</span></p>
+        <button onClick={handleCreateGame} disabled={appPending || crePending} style={{width:'100%',padding:14,background:'var(--success)',color:'#fff',borderRadius:10,fontWeight:700}}>
           {(appPending || crePending) ? '⏳ Обработка...' : GAME_BALANCE_CREATE_BUTTON}
         </button>
+      </div>}
+
+      {tab==='youtube' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
+        <h3 style={{marginBottom:12}}>▶️ YouTube</h3>
+        <p style={{marginBottom:16,opacity:.8}}>{YOUTUBE_SECTION_DESCRIPTION}</p>
+        <a href={YOUTUBE_URL} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'12px 16px',background:'#ff0000',color:'#fff',borderRadius:10,fontWeight:700,textDecoration:'none'}}>{YOUTUBE_BUTTON_TEXT}</a>
+      </div>}
+
+      {tab==='social' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
+        <h3 style={{marginBottom:12}}>{SOCIAL_SECTION_TITLE}</h3>
+        <p style={{marginBottom:16,opacity:.8}}>{YOUTUBE_SECTION_DESCRIPTION}</p>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <a href={YOUTUBE_URL} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'12px 16px',background:'#ff0000',color:'#fff',borderRadius:10,fontWeight:700,textDecoration:'none'}}>{YOUTUBE_BUTTON_TEXT}</a>
+          {SOCIAL_LINKS.map((item:any)=><a key={item.name} href={item.url} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',padding:'12px 16px',background:'var(--bg)',color:'var(--text)',borderRadius:10,textDecoration:'none',border:'1px solid rgba(255,255,255,0.08)'}}>{item.name}</a>)}
+        </div>
       </div>}
 
       {tab==='lobby' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>

@@ -1,11 +1,14 @@
 // config-patch-024.ts - Расширение создания игры с балансом и лобби
 import { useState, useEffect } from 'react';
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { parseUnits, keccak256, stringToBytes } from 'viem';
 import { PATCH_003 } from './config-patch-003';
 import { PATCH_005 } from './config-patch-005';
 import { PATCH_010 } from './config-patch-010';
 import { PATCH_011 } from './config-patch-011';
 import { PATCH_014 } from './config-patch-014';
 import { PATCH_023 } from './config-patch-023';
+import { PATCH_025 } from './config-patch-025';
 
 // 🔹 Новые константы для баланса игры
 export const GAME_BALANCE_WINDOW_TITLE = 'Баланс игры';
@@ -13,16 +16,26 @@ export const GAME_BALANCE_JOIN_BUTTON = 'Играть';
 export const GAME_BALANCE_CREATE_BUTTON = 'Создать игру';
 export const GAME_BALANCE_INVITE_BUTTON = 'Пригласить друга';
 
+export const GAME_ABI = [
+  'function createGame(bytes32 gameId, uint256 stake, uint256 timeLimit) external',
+  'function depositStake(bytes32 gameId) external',
+  'function games(bytes32) external view returns (address creator, address challenger, uint256 stake, bool creatorPaid, bool challengerPaid, address winner, bool isDraw, bool finished, uint256 createdAt, uint256 timeLimit)',
+  'function gameToken() external view returns (address)'
+] as const;
+
+// 🔹 Генерация уникального gameId для блока
+export function makeGameId(address: string) {
+  return keccak256(stringToBytes(`c4c-game-${Date.now()}-${address}`)) as `0x${string}`;
+}
+
 // 🔹 Функция для создания игры с списанием токенов
 export function createGameWithStake(time: number, stake: number, address: string) {
-  // Логика создания игры: approve + create
-  // Предполагается, что approve уже вызван перед create
-  return { gameId: `g_${Date.now()}_${address}`, time, stake, balance: stake };
+  const gameId = makeGameId(address);
+  return { id: gameId, gameId, time, stake, balance: stake };
 }
 
 // 🔹 Функция для присоединения к игре с внесением токенов
 export function joinGameWithStake(gameId: string, stake: number, address: string) {
-  // Логика join: approve + join
   return { success: true, newBalance: stake * 2 };
 }
 
@@ -43,7 +56,6 @@ export function useGameBalanceManager(gameId: string | null) {
 
   useEffect(() => {
     if (gameId) {
-      // Загрузка баланса из контракта или локального состояния
       setBalance({
         gameId,
         creator: '0x...',
@@ -63,6 +75,60 @@ export function useGameBalanceManager(gameId: string | null) {
   };
 
   return { balance, updateBalance };
+}
+
+export function useGameBalance(id: string | null) {
+  const gameContract = (PATCH_023 as any).GAME_ADDR as `0x${string}`;
+  const chainId = (PATCH_023 as any).CHAIN_ID as number;
+  const { data, isLoading } = useReadContract({
+    address: gameContract,
+    abi: GAME_ABI,
+    functionName: 'games',
+    args: id ? [id as `0x${string}`] : undefined,
+    chainId,
+    query: { enabled: !!id }
+  });
+  const game = data as any;
+  const stake = game?.[2] as bigint | undefined;
+  const fromWeiValue = (value: bigint | undefined) => {
+    if (!value) return '0 C4C';
+    return (Number(value) / 10**6).toLocaleString() + ' C4C';
+  };
+  return { balance: fromWeiValue(stake), isLoading };
+}
+
+export function useCreateGame() {
+  const gameContract = (PATCH_023 as any).GAME_ADDR as `0x${string}`;
+  const chainId = (PATCH_023 as any).CHAIN_ID as number;
+  const { writeContract, data: txHash, isPending, isSuccess } = useWriteContract();
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash as `0x${string}` });
+  const create = (gameId: string, time: number, stake: number) => writeContract({
+    address: gameContract,
+    abi: GAME_ABI,
+    functionName: 'createGame',
+    args: [gameId, parseUnits(stake.toString(), 6), BigInt(time)],
+    chainId
+  });
+  return { create, txHash, isPending, isConfirming, isSuccess };
+}
+
+export function useJoinGame() {
+  const gameContract = (PATCH_023 as any).GAME_ADDR as `0x${string}`;
+  const chainId = (PATCH_023 as any).CHAIN_ID as number;
+  const { writeContract, data: txHash, isPending, isSuccess } = useWriteContract();
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash as `0x${string}` });
+  const join = (gameId: string) => writeContract({
+    address: gameContract,
+    abi: GAME_ABI,
+    functionName: 'depositStake',
+    args: [gameId],
+    chainId
+  });
+  return { join, txHash, isPending, isConfirming, isSuccess };
+}
+
+export function useClaimWinnings() {
+  return { claim: async () => undefined, txHash: undefined, isPending: false, isConfirming: false, isSuccess: false };
 }
 
 // 🔹 Функция для публикации игры в лобби
@@ -154,6 +220,7 @@ export const PATCH_024 = {
   ...PATCH_011,
   ...PATCH_014,
   ...PATCH_023,
+  ...PATCH_025,
   GAME_BALANCE_WINDOW_TITLE,
   GAME_BALANCE_JOIN_BUTTON,
   GAME_BALANCE_CREATE_BUTTON,
