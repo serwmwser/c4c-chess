@@ -3,14 +3,14 @@ import { useState, useEffect, ChangeEvent } from 'react'
 import { useAccount, useConnect, useDisconnect, useConnectors, useBalance } from 'wagmi'
 import { Chess } from 'chess.js'
 import {
-  APP_NAME, C4C_TOKEN_ADDRESS, CHAIN_ID, WALLETCONNECT_PROJECT_ID, C4C_BUY_URL,
-  TIME_OPTIONS, STAKE_OPTIONS, UI_THEMES, UI_LANGS, UI_BOARDS, UI_TRANSLATE,
+  APP_NAME, C4C_BUY_URL, TIME_OPTIONS, STAKE_OPTIONS, UI_THEMES, UI_LANGS, UI_BOARDS, UI_TRANSLATE,
   formatTime, formatC4C, getBotMove, saveProfileToStorage, loadProfileFromStorage,
-  resetConnectionStates, getOnlineGames, getFriends, addFriend, processPayout,
+  resetConnectionStates, getFriends, addFriend, processPayout,
   FIXED_CSS, injectGlobalStyles,
-  VALID_STAKES, VALID_TIMES, validateGameConfig, createTokenGameSession, recordGameMove, getMyActiveGames,
-  MIN_STAKE, C4C_DECIMALS, validateStake, ALLOWED_STAKES,
-  useApproveC4C, useCreateTokenGame, useJoinTokenGame, generateGameInvite, sendInviteToChat, publishGameToLobby, canJoinGame, formatPrizePool
+  validateStake, formatPrizePool, formatClock,
+  useApproveC4C, useCreateTokenGame, useJoinTokenGame, useClaimWinnings, useGameBalance,
+  publishGameToLobby, getLobbyGames, generateGameInvite, sendInviteToChat, canJoinGame,
+  initClock, tickClock, makeMove
 } from '@/lib/config'
 
 const PIECES: any = { p:{w:'♙',b:'♟'}, n:{w:'♘',b:'♞'}, b:{w:'♗',b:'♝'}, r:{w:'♖',b:'♜'}, q:{w:'♕',b:'♛'}, k:{w:'♔',b:'♚'} }
@@ -18,7 +18,7 @@ const getPieceSymbol = (p: any) => (!p || !p.type || !p.color) ? '' : PIECES[p.t
 
 export default function Page() {
   const { address, isConnected, chain } = useAccount()
-  const { connect, isPending } = useConnect()
+  const { connect, isPending: walletPending } = useConnect()
   const { disconnect } = useDisconnect()
   const connectors = useConnectors()
 
@@ -26,107 +26,128 @@ export default function Page() {
   const [isClient, setIsClient] = useState(false)
   const [tab, setTab] = useState('profile')
   const [profile, setProfile] = useState<any>({ id:'', name:'', theme:'classic', boardTheme:'blue', description:'', avatar:'', link1Name:'', link1Url:'', link2Name:'', link2Url:'', lang:'ru' })
+  
   const [fen, setFen] = useState(() => new Chess().fen())
   const [selected, setSelected] = useState<string|null>(null)
   const [possibleMoves, setPossibleMoves] = useState<string[]>([])
+  const [over, setOver] = useState<string|null>(null)
+  
   const [timeCtrl, setTimeCtrl] = useState(900)
   const [stake, setStake] = useState(5000)
-  const [wTime, setWTime] = useState(900)
-  const [bTime, setBTime] = useState(900)
-  const [over, setOver] = useState<string|null>(null)
+  
   const [games, setGames] = useState<any[]>([])
   const [currentGame, setCurrentGame] = useState<any>(null)
   const [moveHistory, setMoveHistory] = useState<string[]>([])
   const [friends, setFriends] = useState<any[]>([])
   const [newFriendAddr, setNewFriendAddr] = useState('')
 
-  const balanceResult = useBalance({ address, token: C4C_TOKEN_ADDRESS as `0x${string}`, query: { enabled: !!address && !!chain?.id && chain.id === CHAIN_ID } })
+  const [clock, setClock] = useState<any>(null)
+
+  // 🔹 Баланс кошелька
+  const balanceResult = useBalance({ address, token: '0xaac20575371de01b4d10c4e7566d5453d72d56e7' as `0x${string}`, query: { enabled: !!address && chain?.id === 56 } })
   const balance = balanceResult.data
 
-  const { approve: approveTokens, isPending: isApproving } = useApproveC4C()
-  const { create: createOnChain, isPending: isCreating } = useCreateTokenGame()
-  const { join: joinOnChain, isPending: isJoining } = useJoinTokenGame()
+  // 🔹 Контрактные хуки
+  const { approve, isPending: appPending } = useApproveC4C()
+  const { create: createOnChain, isPending: crePending } = useCreateTokenGame()
+  const { join: joinOnChain, isPending: joinPending } = useJoinTokenGame()
+  const { claim, isPending: claimPending } = useClaimWinnings()
+  const { balance: onChainBalance, isLoading: balLoading } = useGameBalance(currentGame?.id || null)
 
+  // 🔹 Инициализация
   useEffect(() => { if (isClient && FIXED_CSS) injectGlobalStyles(FIXED_CSS) }, [isClient])
   useEffect(() => { setIsClient(true)
     const saved = loadProfileFromStorage()
     if (saved && address) setProfile({ ...saved, id: address })
     else if (address) setProfile((p:any) => ({ ...p, id: address, name: p.name || `Player_${address.slice(2,8)}` }))
-    setGames(getOnlineGames()); setFriends(getFriends())
+    setGames(getLobbyGames()); setFriends(getFriends())
   }, [address])
 
-  useEffect(() => { setWTime(timeCtrl); setBTime(timeCtrl); setOver(null) }, [timeCtrl])
-  useEffect(() => {
-    if (over) return
-    const g = new Chess(fen); const isW = g.turn() === 'w'
-    if ((isW ? wTime : bTime) <= 0) { setOver(isW ? '⚪ Время вышло!' : '⚫ Время вышло!'); if(isW) processPayout(address||'',stake); return }
-    const t = setInterval(() => { isW ? setWTime((p:number)=>Math.max(0,p-1)) : setBTime((p:number)=>Math.max(0,p-1)) }, 1000)
-    return () => clearInterval(t)
-  }, [fen,wTime,bTime,over,address,stake])
-
-  useEffect(() => {
-    if (!over) { const g = new Chess(fen)
-      if (g.turn() === 'b' && !g.isGameOver()) {
-        const t = setTimeout(() => {
-          const moves = g.moves({verbose:true}); const mv = moves.length ? moves[Math.floor(Math.random()*moves.length)] : null
-          if (mv) { g.move(mv); setFen(g.fen()); setBTime((p:number)=>Math.max(0,p-4)); if(g.isCheckmate()) { setOver('⚫ Бот победил!'); processPayout(address||'',stake) } }
-        }, 1500); return () => clearTimeout(t)
-      }
-    }
-  }, [fen,over,address,stake])
-
+  // 🔹 Тема
   useEffect(() => {
     if (profile.theme && isClient) { const th = (UI_THEMES as any)[profile.theme]
       if (th) { document.documentElement.style.setProperty('--bg',th.bg); document.documentElement.style.setProperty('--text',th.text); document.documentElement.style.setProperty('--accent',th.accent); document.documentElement.style.setProperty('--card',th.card) }
     }
   }, [profile.theme,isClient])
 
+  // 🔹 Шахматные часы: тикают каждую секунду
+  useEffect(() => {
+    if (!clock || !clock.active || clock.finished) return;
+    const timer = setInterval(() => setClock((prev: any) => prev ? tickClock(prev) : prev), 1000);
+    return () => clearInterval(timer);
+  }, [clock?.active, clock?.finished]);
+
+  // 🔹 Авто-выдача выигрыша при просрочке времени
+  useEffect(() => {
+    if (clock?.finished && currentGame && !over) {
+      claim(currentGame.id);
+      setOver(`⏱️ Время вышло! ${clock.winner === 'w' ? '⚪ Белые' : '⚫ Чёрные'} победили.`);
+    }
+  }, [clock?.finished, currentGame, over, claim]);
+
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onloadend = () => updateProfile({ avatar: reader.result }); reader.readAsDataURL(file) }
   const updateProfile = (updates: any) => { const np = { ...profile, ...updates }; setProfile(np); saveProfileToStorage(np) }
-  const handleConnect = async (connector: any) => { try { await connect({connector}); setShowModal(false) } catch { resetConnectionStates() } }
+  const handleConnect = async (connector: any) => { try { await connect({ connector }); setShowModal(false) } catch { resetConnectionStates() } }
 
+  // 🔥 Создание игры + депозит в баланс
   const handleCreateGame = async () => {
-    const check = validateStake(stake);
-    if (!check.valid) { alert(`❌ ${check.error}`); return; }
-    if (!address) { alert('🔗 Подключите кошелёк'); return; }
-    const confirmed = confirm(`🎮 Создать игру?\n💰 Ваша ставка: ${formatC4C(stake)} C4C\n🏆 Призовой фонд: ${formatPrizePool(stake)}\n⚠️ Токены будут списаны.`)
-    if (!confirmed) return;
+    if (!validateStake(stake)) { alert('❌ Выбери ставку из списка'); return; }
+    if (!address) { alert('🔗 Подключи кошелёк'); return; }
+    if (!confirm(`🎮 Создать игру?\n💰 Ставка: ${formatC4C(stake)} C4C\n🏆 Фонд: ${formatPrizePool(stake)}\n⚠️ Токены спишутся в контракт.`)) return;
+    
     try {
-      await approveTokens(stake); await createOnChain(timeCtrl, stake);
-      const game = createTokenGameSession(address, stake, timeCtrl); (game as any).balance = stake; publishGameToLobby(game);
-      alert(`✅ Игра создана!\n🏆 Фонд: ${formatPrizePool(stake)}\n🔗 Ссылка скопирована!`);
-      if (navigator.clipboard) navigator.clipboard.writeText(`${window.location.origin}/?join=${game.id}`);
-      setGames(getOnlineGames());
-    } catch (e: any) { alert(`❌ Ошибка: ${e.message || 'Не удалось создать игру'}`); }
+      await approve(stake); await createOnChain(timeCtrl, stake);
+      const g = { id: `g_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, creator: address, stake, timeCtrl, status: 'waiting' };
+      publishGameToLobby(g); setCurrentGame(g); setClock(initClock(timeCtrl)); setGames(getLobbyGames());
+      alert('✅ Игра создана! Токены в балансе игры.');
+    } catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
   };
 
-  const handleJoinGame = async (game: any) => {
-    if (!address) return alert('🔗 Подключите кошелёк');
-    const { canJoin: ok, reason } = await canJoinGame(game.id, address, game.stake);
-    if (!ok) return alert(`❌ ${reason}`);
-    if (!confirm(`Присоединиться? Ставка: ${formatC4C(game.stake)} C4C`)) return;
-    try { await joinOnChain(game.id); alert('✅ Вы в игре!'); setGames(getOnlineGames()); } catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
+  // 🔥 Присоединение к игре
+  const handleJoinGame = async (g: any) => {
+    if (!address) return alert('🔗 Подключи кошелёк');
+    const { canJoin, reason } = await canJoinGame(g.id, address, g.stake);
+    if (!canJoin) return alert(`❌ ${reason}`);
+    if (!confirm(`Присоединиться? Ставка: ${formatC4C(g.stake)} C4C`)) return;
+    try { await approve(g.stake); await joinOnChain(g.id); setGames(getLobbyGames()); alert('✅ Вы в игре!'); } 
+    catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
   };
 
+  // 🔥 Ход + переключение часов
   const click = (sq: string) => {
-    if (over) return; if (selected === sq) { setSelected(null); setPossibleMoves([]); return }
+    if (over) return; 
+    if (selected === sq) { setSelected(null); setPossibleMoves([]); return; }
     const g = new Chess(fen);
-    if (selected) { try { const m = g.move({ from: selected as any, to: sq as any, promotion: 'q' }); if (m) { setFen(g.fen()); setSelected(null); setPossibleMoves([]); if (g.isCheckmate()) { setOver('⚪ Вы победили!'); processPayout(address||'',stake) } return } } catch {} }
-    const piece = g.get(sq as any); if (piece && piece.color === g.turn()) { setSelected(sq); setPossibleMoves(g.moves({ square: sq as any, verbose: true }).map((m:any)=>m.to)) } else { setSelected(null); setPossibleMoves([]) }
-  }
-  const reset = () => { setFen(new Chess().fen()); setSelected(null); setPossibleMoves([]); setWTime(timeCtrl); setBTime(timeCtrl); setOver(null); setCurrentGame(null); setMoveHistory([]) }
-  const g = new Chess(fen)
+    if (selected) {
+      try {
+        const m = g.move({ from: selected as any, to: sq as any, promotion: 'q' });
+        if (m) {
+          setFen(g.fen()); setSelected(null); setPossibleMoves([]);
+          setMoveHistory((prev: string[]) => [...prev, m.san]);
+          setClock((prev: any) => prev ? makeMove(prev) : prev); // ⏱️ Переключаем часы
+          if (g.isCheckmate()) { setOver('⚪ Вы победили!'); processPayout(address||'',stake); }
+          return;
+        }
+      } catch {}
+    }
+    const piece = g.get(sq as any);
+    if (piece && piece.color === g.turn()) { setSelected(sq); setPossibleMoves(g.moves({ square: sq as any, verbose: true }).map((mv:any)=>mv.to)); } 
+    else { setSelected(null); setPossibleMoves([]); }
+  };
+
+  const reset = () => { setFen(new Chess().fen()); setSelected(null); setPossibleMoves([]); setOver(null); setCurrentGame(null); setMoveHistory([]); setClock(null); }
+  const chess = new Chess(fen)
   const L = profile.lang || 'ru'
   const tr = (key: string) => (UI_TRANSLATE as any)?.(L, key) || key
 
-  if (!isClient) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text)'}}>⏳</div>
+  if (!isClient) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text)'}}>⏳ Загрузка...</div>
   if (!isConnected) return <div style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)',padding:20,display:'flex',flexDirection:'column',alignItems:'center',textAlign:'center'}}>
     <h1 style={{fontSize:36,marginBottom:16}}>♟️{APP_NAME}</h1>
-    <button onClick={()=>setShowModal(true)} disabled={isPending} style={{padding:'16px 48px',background:isPending?'#6b7280':'var(--accent)',borderRadius:12,fontSize:18}}>{isPending?'⏳...':'🔗 Войти'}</button>
+    <button onClick={()=>setShowModal(true)} disabled={walletPending} style={{padding:'16px 48px',background:walletPending?'#6b7280':'var(--accent)',borderRadius:12,fontSize:18}}>{walletPending?'⏳...':'🔗 Войти'}</button>
     {showModal && <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setShowModal(false)}>
       <div style={{background:'var(--card)',padding:24,borderRadius:16,maxWidth:360,width:'100%'}} onClick={(e:any)=>e.stopPropagation()}>
         <h3 style={{textAlign:'center',marginBottom:20}}>Выберите кошелёк</h3>
-        {connectors.map((c:any)=><button key={c.id} onClick={()=>handleConnect(c)} disabled={isPending} style={{width:'100%',padding:14,margin:'8px 0',background:'#3b82f6',color:'#fff',borderRadius:10}}>{c.name}</button>)}
+        {connectors.map((c:any)=><button key={c.id} onClick={()=>handleConnect(c)} disabled={walletPending} style={{width:'100%',padding:14,margin:'8px 0',background:'#3b82f6',color:'#fff',borderRadius:10}}>{c.name}</button>)}
         <button onClick={()=>setShowModal(false)} style={{width:'100%',padding:12,marginTop:16,background:'var(--border)',borderRadius:8}}>Закрыть</button>
       </div>
     </div>}
@@ -139,9 +160,10 @@ export default function Page() {
         <button onClick={()=>disconnect()} style={{background:'var(--error)',padding:'8px 16px',borderRadius:6,color:'#fff'}}>Выйти</button>
       </div>
       <div style={{display:'flex',gap:8,marginBottom:16}}>
-        {['profile','lobby','friends'].map((tabKey:string)=><button key={tabKey} onClick={()=>setTab(tabKey)} style={{flex:1,padding:10,background:tab===tabKey?'var(--accent)':'var(--card)',borderRadius:8,color:tab===tabKey?'#000':'var(--text)'}}>{tabKey==='profile'?'👤 Профиль':tabKey==='lobby'?'🎲 Лобби':'👥 Друзья'}</button>)}
+        {['profile','lobby','friends'].map(t=><button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:10,background:tab===t?'var(--accent)':'var(--card)',borderRadius:8,color:tab===t?'#000':'var(--text)'}}>{t==='profile'?'👤 Профиль':t==='lobby'?'🎲 Лобби':'👥 Друзья'}</button>)}
       </div>
 
+      {/* 🔹 ПРОФИЛЬ */}
       {tab==='profile' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
         <div style={{display:'flex',gap:16,alignItems:'flex-start',marginBottom:16}}>
           <label style={{width:80,height:80,borderRadius:'50%',background:'var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',overflow:'hidden',border:'3px solid var(--accent)'}}>
@@ -150,41 +172,74 @@ export default function Page() {
           </label>
           <div style={{flex:1}}>
             <input value={profile.name} onChange={(e:any)=>updateProfile({name:e.target.value})} placeholder="Ваше имя" style={{padding:10,fontWeight:600,marginBottom:6}}/>
-            <p style={{fontSize:13,opacity:.7}}>Баланс: <span style={{fontSize:18,fontWeight:'bold',color:'var(--accent)'}}>{formatC4C(balance?.value)} C4C</span></p>
+            <p style={{fontSize:13,opacity:.7}}>Баланс кошелька: <span style={{fontSize:18,fontWeight:'bold',color:'var(--accent)'}}>{formatC4C(balance?.value)} C4C</span></p>
             <a href={C4C_BUY_URL} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',marginTop:8,padding:'8px 16px',background:'linear-gradient(135deg,#ec4899,#db2777)',color:'#fff',textDecoration:'none',borderRadius:8,fontSize:13}}>🛒 Купить C4C</a>
           </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:4}}>
-          <div><label style={{fontSize:12,opacity:.7}}>💰 Ставка</label><select value={stake} onChange={(e:any)=>setStake(Number(e.target.value))} style={{width:'100%',padding:8,marginTop:4,borderRadius:6}}>{ALLOWED_STAKES.map(val => <option key={val} value={val}>{val.toLocaleString()} C4C</option>)}</select></div>
-          <div><label style={{fontSize:12,opacity:.7}}>🏆 Призовой фонд</label><div style={{padding:8,marginTop:4,background:'var(--bg)',borderRadius:6,fontWeight:'bold',color:'var(--accent)'}}>{formatPrizePool(stake)}</div></div>
+          <div><label style={{fontSize:12,opacity:.7}}>⏱️ Время</label>
+            <select value={timeCtrl} onChange={(e:any)=>setTimeCtrl(Number(e.target.value))} style={{width:'100%',padding:8,marginTop:4,borderRadius:6}}>
+              {TIME_OPTIONS.map((o:any)=><option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div><label style={{fontSize:12,opacity:.7}}>💰 Ставка</label>
+            <select value={stake} onChange={(e:any)=>setStake(Number(e.target.value))} style={{width:'100%',padding:8,marginTop:4,borderRadius:6}}>
+              {STAKE_OPTIONS.map(val=><option key={val} value={val}>{val.toLocaleString()} C4C</option>)}
+            </select>
+          </div>
         </div>
-        <button onClick={handleCreateGame} disabled={isCreating || isApproving} style={{width:'100%',padding:12,marginTop:8,background:'var(--success)',color:'#fff',borderRadius:8,fontWeight:600}}>{(isCreating || isApproving) ? '⏳ Обработка...' : '🎮 Создать игру на токены'}</button>
+        <p style={{fontSize:14,marginTop:8}}>🏆 Призовой фонд: <span style={{color:'var(--accent)'}}>{formatPrizePool(stake)}</span></p>
+        <button onClick={handleCreateGame} disabled={appPending || crePending} style={{width:'100%',padding:12,marginTop:8,background:'var(--success)',color:'#fff',borderRadius:8,fontWeight:600}}>
+          {(appPending || crePending) ? '⏳ Обработка транзакции...' : '🎮 Создать игру на токены'}
+        </button>
       </div>}
 
+      {/* 🔹 ЛОББИ С БАЛАНСОМ И ПРИГЛАШЕНИЯМИ */}
       {tab==='lobby' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
         <h3 style={{marginBottom:12}}>🎲 Лобби</h3>
-        {games.length===0 ? <p style={{opacity:.7}}>Нет игр</p> : games.map((game:any)=>(
-          <div key={game.id} style={{padding:10,background:'var(--bg)',borderRadius:8,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <div><p style={{fontWeight:600}}>🎮 {game.id.slice(0,12)}... | 🏆 {formatPrizePool(game.stake)}</p>
-            <p style={{fontSize:12,opacity:.6}}>Ставка: {formatC4C(game.stake)} | Время: {formatTime(game.timeControl)} | 👤 {game.creator.slice(2,6)}... | 💰 Баланс: {(game.balance||game.stake).toLocaleString()} C4C</p></div>
-            <div style={{display:'flex',gap:6}}>
-              <button onClick={()=>handleJoinGame(game)} disabled={isJoining} style={{padding:'6px 14px',background:'#3b82f6',color:'#fff',borderRadius:6}}>{isJoining?'⏳...':'▶️ Играть'}</button>
-              {game.creator.toLowerCase() === address?.toLowerCase() && (<button onClick={()=>{const inv = generateGameInvite(game.id, profile.name||'Player', game.stake, game.timeControl); if(friends[0]) { sendInviteToChat(friends[0].address, inv); alert(`📩 Отправлено ${friends[0].name}!`); } else if(navigator.clipboard) { navigator.clipboard.writeText(inv.copy); alert('🔗 Ссылка скопирована!'); }}} style={{padding:'6px 14px',background:'#10b981',color:'#fff',borderRadius:6}}>📩</button>)}
+        {games.length===0 ? <p style={{opacity:.7}}>Нет активных игр</p> : games.map((g:any)=>(
+          <div key={g.id} style={{padding:12,background:'var(--bg)',borderRadius:8,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <p style={{fontWeight:600}}>🎮 {g.id.slice(0,12)}... | 👤 {g.creator.slice(2,6)}...</p>
+              <p style={{fontSize:12,opacity:.6}}>💰 Баланс: {balLoading ? '...' : (onChainBalance || g.balance?.toLocaleString() || '0')} C4C | ⏱️ {(g.timeCtrl/60)}м</p>
             </div>
-          </div>))}
+            <div style={{display:'flex',gap:6}}>
+              <button onClick={()=>handleJoinGame(g)} disabled={joinPending} style={{padding:'6px 12px',background:'#3b82f6',color:'#fff',borderRadius:6}}>{joinPending?'⏳...':'▶️ Играть'}</button>
+              {g.creator.toLowerCase() === address?.toLowerCase() && <button onClick={()=>{
+                const i = generateGameInvite(g.id, profile.name||'Player', g.stake, g.timeCtrl);
+                if(navigator.clipboard) { navigator.clipboard.writeText(i.text); alert('📩 Ссылка скопирована!'); }
+              }} style={{padding:'6px 12px',background:'#10b981',color:'#fff',borderRadius:6}}>📩</button>}
+            </div>
+          </div>
+        ))}
       </div>}
 
+      {/* 🔹 ДРУЗЬЯ */}
       {tab==='friends' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
         <h3 style={{marginBottom:12}}>👥 Друзья</h3>
         <div style={{display:'flex',gap:8,marginBottom:12}}><input value={newFriendAddr} onChange={(e:any)=>setNewFriendAddr(e.target.value)} placeholder="Адрес"/><button onClick={()=>{if(newFriendAddr.length>3){addFriend({address:newFriendAddr,name:`Friend ${newFriendAddr.slice(2,6)}`,status:'online',addedAt:Date.now()});setFriends(getFriends());setNewFriendAddr('')}}} style={{background:'#3b82f6',color:'#fff',padding:'0 16px',borderRadius:6}}>➕</button></div>
-        {friends.length===0 ? <p style={{opacity:.7}}>Нет друзей</p> : friends.map((f:any)=>(<div key={f.address} style={{padding:10,background:'var(--bg)',borderRadius:8,marginBottom:6,display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>{f.name}</span><button onClick={()=>alert(`📩 ${f.name}`)} style={{padding:'4px 10px',background:'var(--success)',color:'#fff',borderRadius:4,fontSize:12}}>📩</button></div>))}
+        {friends.length===0 ? <p style={{opacity:.7}}>Нет друзей</p> : friends.map((f:any)=>(<div key={f.address} style={{padding:10,background:'var(--bg)',borderRadius:8,marginBottom:6,display:'flex',justifyContent:'space-between'}}><span>{f.name}</span><button onClick={()=>alert(`📩 ${f.name}`)} style={{background:'var(--success)',color:'#fff',padding:'4px 10px',borderRadius:4}}>📩</button></div>))}
       </div>}
 
+      {/* 🔹 ДОСКА + ОКНО БАЛАНСА ИГРЫ */}
       <div style={{marginTop:16,background:'var(--card)',padding:16,borderRadius:16}}>
-        {currentGame && <div style={{marginBottom:12,padding:10,background:'var(--bg)',borderRadius:8}}><p style={{fontSize:14,fontWeight:600}}>🎮 Игра: {currentGame.id}</p><p style={{fontSize:12,opacity:.7}}>Баланс игры: {formatPrizePool(currentGame.stake)}</p></div>}
+        {currentGame && (
+          <div style={{padding:12,background:'var(--bg)',borderRadius:8,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <h4 style={{margin:0}}>🏆 Баланс игры</h4>
+              <p style={{fontSize:20,fontWeight:'bold',color:'var(--accent)'}}>{balLoading ? '⏳' : (onChainBalance || currentGame.balance?.toLocaleString() || '0')} C4C</p>
+            </div>
+            {clock && <div style={{textAlign:'right',fontSize:16,fontFamily:'monospace'}}>
+              <div>⚪ Белые: {formatClock(clock.white)}</div>
+              <div>⚫ Чёрные: {formatClock(clock.black)}</div>
+            </div>}
+          </div>
+        )}
+        
         <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:0,maxWidth:360,margin:'0 auto',borderRadius:8,overflow:'hidden',boxShadow:'0 4px 12px rgba(0,0,0,.4)'}}>
           {['8','7','6','5','4','3','2','1'].map((r,ri)=>['a','b','c','d','e','f','g','h'].map((f,fi)=>{
-            const sq=f+r; const p=g.get(sq as any); const boardT = (UI_BOARDS as any)[profile.boardTheme] || (UI_BOARDS as any).blue; const bg=(fi+ri)%2===0 ? boardT.light : boardT.dark
+            const sq=f+r; const p=chess.get(sq as any); const boardT = (UI_BOARDS as any)[profile.boardTheme] || (UI_BOARDS as any).blue; 
+            const bg=(fi+ri)%2===0 ? boardT.light : boardT.dark
             return <div key={sq} onClick={()=>click(sq)} style={{aspectRatio:1,background:bg,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',border:selected===sq?'3px solid var(--accent)':'none'}}>
               {fi===0 && <span style={{position:'absolute',top:2,left:4,fontSize:10,fontWeight:700,color:(fi+ri)%2===0?boardT.dark:boardT.light,opacity:.7,pointerEvents:'none'}}>{r}</span>}
               {ri===7 && <span style={{position:'absolute',bottom:2,right:4,fontSize:10,fontWeight:700,color:(fi+ri)%2===0?boardT.dark:boardT.light,opacity:.7,pointerEvents:'none'}}>{f}</span>}
@@ -194,7 +249,11 @@ export default function Page() {
             </div>
           }))}
         </div>
-        <div style={{textAlign:'center',marginTop:12}}>{over && <p style={{color:'var(--error)',fontWeight:'bold',fontSize:16}}>{over}</p>}<button onClick={reset} style={{padding:'8px 20px',background:'#3b82f6',color:'#fff',borderRadius:6}}>🔄 Новая игра</button></div>
+        
+        {moveHistory.length > 0 && <div style={{marginTop:12,maxHeight:80,overflowY:'auto',background:'var(--bg)',padding:8,borderRadius:6,fontSize:12}}><strong>📜 Ходы:</strong> {moveHistory.join(' ')}</div>}
+        <div style={{textAlign:'center',marginTop:12}}>{over && <p style={{color:'var(--error)',fontWeight:'bold',fontSize:16}}>{over}</p>}
+          {claimPending ? '⏳ Выплата...' : <button onClick={reset} style={{padding:'8px 20px',background:'#3b82f6',color:'#fff',borderRadius:6}}>🔄 Новая игра</button>}
+        </div>
       </div>
     </div>
   </div>
