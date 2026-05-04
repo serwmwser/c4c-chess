@@ -10,7 +10,11 @@ import {
   validateStake, formatPrizePool, formatClock,
   useApproveC4C, useCreateTokenGame, useJoinTokenGame, useClaimWinnings, useGameBalance,
   publishGameToLobby, getLobbyGames, generateGameInvite, sendInviteToChat, canJoinGame,
-  initClock, tickClock, makeMove
+  initClock, tickClock, makeMove,
+  GAME_BALANCE_WINDOW_TITLE, GAME_BALANCE_JOIN_BUTTON, GAME_BALANCE_CREATE_BUTTON, GAME_BALANCE_INVITE_BUTTON,
+  createGameWithStake, joinGameWithStake, useGameBalanceManager, publishGameToLobbyExtended,
+  getLobbyGamesExtended, generateGameInviteExtended, sendInviteToChatExtended, canJoinGameExtended,
+  initClockExtended, tickClockExtended, makeMoveExtended, checkTimeWin, formatClockExtended, processTimeWin
 } from '@/lib/config'
 
 const PIECES: any = { p:{w:'♙',b:'♟'}, n:{w:'♘',b:'♞'}, b:{w:'♗',b:'♝'}, r:{w:'♖',b:'♜'}, q:{w:'♕',b:'♛'}, k:{w:'♔',b:'♚'} }
@@ -49,14 +53,14 @@ export default function Page() {
   const { create: createOnChain, isPending: crePending } = useCreateTokenGame()
   const { join: joinOnChain, isPending: joinPending } = useJoinTokenGame()
   const { claim, isPending: claimPending } = useClaimWinnings()
-  const { balance: onChainBalance, isLoading: balLoading } = useGameBalance(currentGame?.id || null)
+  const { balance: gameBalance, updateBalance } = useGameBalanceManager(currentGame?.id || null);
 
   useEffect(() => { if (isClient && FIXED_CSS) injectGlobalStyles(FIXED_CSS) }, [isClient])
   useEffect(() => { setIsClient(true)
     const saved = loadProfileFromStorage()
     if (saved && address) setProfile({ ...saved, id: address })
     else if (address) setProfile((p:any) => ({ ...p, id: address, name: p.name || `Player_${address.slice(2,8)}` }))
-    setGames(getLobbyGames()); setFriends(getFriends())
+    setGames(getLobbyGamesExtended()); setFriends(getFriends())
   }, [address])
 
   useEffect(() => {
@@ -66,17 +70,21 @@ export default function Page() {
   }, [profile.theme,isClient])
 
   useEffect(() => {
-    if (!clock || !clock.active || clock.finished) return;
-    const timer = setInterval(() => setClock((prev: any) => prev ? tickClock(prev) : prev), 1000);
+    if (!clock || !clock.isRunning || clock.finished) return;
+    const timer = setInterval(() => setClock((prev: any) => prev ? tickClockExtended(prev) : prev), 1000);
     return () => clearInterval(timer);
-  }, [clock?.active, clock?.finished]);
+  }, [clock?.isRunning, clock?.finished]);
 
   useEffect(() => {
-    if (clock?.finished && currentGame && !over) {
-      claim(currentGame.id);
-      setOver(`⏱️ Время вышло! ${clock.winner === 'w' ? '⚪ Белые' : '⚫ Чёрные'} победили.`);
+    if (clock && clock.isRunning) {
+      const winner = checkTimeWin(clock);
+      if (winner) {
+        setOver(`⏱️ Время вышло! ${winner === 'white' ? '⚪ Белые' : '⚫ Чёрные'} победили.`);
+        processTimeWin(winner, currentGame?.id || '');
+        claim(currentGame?.id || '');
+      }
     }
-  }, [clock?.finished, currentGame, over, claim]);
+  }, [clock, currentGame, over, claim]);
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onloadend = () => updateProfile({ avatar: reader.result }); reader.readAsDataURL(file) }
   const updateProfile = (updates: any) => { const np = { ...profile, ...updates }; setProfile(np); saveProfileToStorage(np) }
@@ -85,21 +93,34 @@ export default function Page() {
   const handleCreateGame = async () => {
     if (!validateStake(stake)) { alert('❌ Выбери ставку из списка'); return; }
     if (!address) { alert('🔗 Подключи кошелёк'); return; }
-    if (!confirm(`🎮 Создать игру?\n💰 Ставка: ${formatC4C(stake)} C4C\n🏆 Фонд: ${formatPrizePool(stake)}\n⚠️ Токены спишутся в контракт.`)) return;
+    if (!confirm(`🎮 Создать игру?\n💰 Ставка: ${formatC4C(stake)} C4C\n🏆 Фонд: ${formatPrizePool(stake)}\n⚠️ Токены спишутся в баланс игры.`)) return;
     try {
       await approve(stake); await createOnChain(timeCtrl, stake);
-      const g = { id: `g_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, creator: address, stake, timeCtrl, status: 'waiting' };
-      publishGameToLobby(g); setCurrentGame(g); setClock(initClock(timeCtrl)); setGames(getLobbyGames());
+      const gameData = createGameWithStake(timeCtrl, stake, address);
+      publishGameToLobbyExtended({
+        gameId: gameData.gameId,
+        creator: address,
+        stake,
+        currentBalance: gameData.balance,
+        timeControl: timeCtrl,
+        players: [address],
+        status: 'waiting'
+      });
+      setCurrentGame(gameData); setClock(initClockExtended(timeCtrl)); setGames(getLobbyGamesExtended());
       alert('✅ Игра создана! Токены в балансе игры.');
     } catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
   };
 
   const handleJoinGame = async (g: any) => {
     if (!address) return alert('🔗 Подключи кошелёк');
-    const { canJoin, reason } = await canJoinGame(g.id, address, g.stake);
-    if (!canJoin) return alert(`❌ ${reason}`);
+    if (!canJoinGameExtended(g, address)) return alert('❌ Нельзя присоединиться');
     if (!confirm(`Присоединиться? Ставка: ${formatC4C(g.stake)} C4C`)) return;
-    try { await approve(g.stake); await joinOnChain(g.id); setGames(getLobbyGames()); alert('✅ Вы в игре!'); } 
+    try { 
+      await approve(g.stake); await joinOnChain(g.id); 
+      joinGameWithStake(g.gameId, g.stake, address);
+      updateBalance(g.currentBalance + g.stake);
+      setGames(getLobbyGamesExtended()); alert('✅ Вы в игре!'); 
+    } 
     catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
   };
 
@@ -113,7 +134,7 @@ export default function Page() {
         if (m) {
           setFen(g.fen()); setSelected(null); setPossibleMoves([]);
           setMoveHistory((prev: string[]) => [...prev, m.san]);
-          setClock((prev: any) => prev ? makeMove(prev) : prev);
+          setClock((prev: any) => prev ? makeMoveExtended(prev, g.turn() === 'w' ? 'white' : 'black') : prev);
           if (g.isCheckmate()) { setOver('⚪ Вы победили!'); processPayout(address||'',stake); }
           return;
         }
@@ -178,24 +199,24 @@ export default function Page() {
         </div>
         <p style={{fontSize:14,marginTop:8}}>🏆 Призовой фонд: <span style={{color:'var(--accent)'}}>{formatPrizePool(stake)}</span></p>
         <button onClick={handleCreateGame} disabled={appPending || crePending} style={{width:'100%',padding:12,marginTop:8,background:'var(--success)',color:'#fff',borderRadius:8,fontWeight:600}}>
-          {(appPending || crePending) ? '⏳ Обработка...' : '🎮 Создать игру на токены'}
+          {(appPending || crePending) ? '⏳ Обработка...' : GAME_BALANCE_CREATE_BUTTON}
         </button>
       </div>}
 
       {tab==='lobby' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
         <h3 style={{marginBottom:12}}>🎲 Лобби</h3>
         {games.length===0 ? <p style={{opacity:.7}}>Нет игр</p> : games.map((g:any)=>(
-          <div key={g.id} style={{padding:12,background:'var(--bg)',borderRadius:8,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div key={g.gameId || g.id} style={{padding:12,background:'var(--bg)',borderRadius:8,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div>
-              <p style={{fontWeight:600}}>🎮 {g.id.slice(0,12)}... | 👤 {g.creator.slice(2,6)}...</p>
-              <p style={{fontSize:12,opacity:.6}}>💰 Баланс: {balLoading ? '...' : (onChainBalance || g.balance?.toLocaleString() || '0')} C4C | ⏱️ {(g.timeCtrl/60)}м</p>
+              <p style={{fontWeight:600}}>🎮 {(g.gameId || g.id).slice(0,12)}... | 👤 {g.creator.slice(2,6)}...</p>
+              <p style={{fontSize:12,opacity:.6}}>💰 Баланс: {g.currentBalance ? formatC4C(g.currentBalance) : (balLoading ? '...' : (onChainBalance || g.balance?.toLocaleString() || '0') + ' C4C')} | ⏱️ {(g.timeControl || g.timeCtrl)/60}м</p>
             </div>
             <div style={{display:'flex',gap:6}}>
-              <button onClick={()=>handleJoinGame(g)} disabled={joinPending} style={{padding:'6px 12px',background:'#3b82f6',color:'#fff',borderRadius:6}}>{joinPending?'⏳...':'▶️ Играть'}</button>
+              <button onClick={()=>handleJoinGame(g)} disabled={joinPending} style={{padding:'6px 12px',background:'#3b82f6',color:'#fff',borderRadius:6}}>{joinPending?'⏳...':GAME_BALANCE_JOIN_BUTTON}</button>
               {g.creator.toLowerCase() === address?.toLowerCase() && <button onClick={()=>{
-                const i = generateGameInvite(g.id, profile.name||'Player', g.stake, g.timeCtrl);
-                if(navigator.clipboard) { navigator.clipboard.writeText(i.text); alert('📩 Ссылка скопирована!'); }
-              }} style={{padding:'6px 12px',background:'#10b981',color:'#fff',borderRadius:6}}>📩</button>}
+                const i = generateGameInviteExtended(g.gameId || g.id);
+                if(navigator.clipboard) { navigator.clipboard.writeText(i); alert('📩 Ссылка скопирована! Отправь другу или в чат.'); }
+              }} style={{padding:'6px 12px',background:'#10b981',color:'#fff',borderRadius:6}}>{GAME_BALANCE_INVITE_BUTTON}</button>}
             </div>
           </div>
         ))}
@@ -211,12 +232,12 @@ export default function Page() {
         {currentGame && (
           <div style={{padding:12,background:'var(--bg)',borderRadius:8,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div>
-              <h4 style={{margin:0}}>🏆 Баланс игры</h4>
-              <p style={{fontSize:20,fontWeight:'bold',color:'var(--accent)'}}>{balLoading ? '⏳' : (onChainBalance || currentGame.balance?.toLocaleString() || '0')} C4C</p>
+              <h4 style={{margin:0}}>{GAME_BALANCE_WINDOW_TITLE}</h4>
+              <p style={{fontSize:20,fontWeight:'bold',color:'var(--accent)'}}>{gameBalance ? formatC4C(gameBalance.currentBalance) : (balLoading ? '⏳' : (onChainBalance || currentGame?.balance?.toLocaleString() || '0') + ' C4C')}</p>
             </div>
             {clock && <div style={{textAlign:'right',fontSize:16,fontFamily:'monospace'}}>
-              <div>⚪ Белые: {formatClock(clock.white)}</div>
-              <div>⚫ Чёрные: {formatClock(clock.black)}</div>
+              <div>⚪ Белые: {formatClockExtended(clock.whiteTime)}</div>
+              <div>⚫ Чёрные: {formatClockExtended(clock.blackTime)}</div>
             </div>}
           </div>
         )}

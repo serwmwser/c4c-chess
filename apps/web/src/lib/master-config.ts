@@ -1,11 +1,11 @@
 import { CONFIG_BASE } from './config-base';
 // 🔹 АКТИВНЫЕ ПАТЧИ (только рабочие)
-import { PATCH_023 } from './config-patch-023';
+import { PATCH_024 } from './config-patch-024';
 
 // 🔹 КОНСТРУКТОР: Только то, что нужно
 export const CONFIG = {
   ...CONFIG_BASE,
-  ...PATCH_023
+  ...PATCH_024
 };
 
 // 🔹 ЯВНЫЕ ЭКСПОРТЫ (всё из PATCH_023)
@@ -57,8 +57,21 @@ export const generateGameInvite = CONFIG.generateGameInvite;
 export const sendInviteToChat = CONFIG.sendInviteToChat;
 export const canJoinGame = CONFIG.canJoinGame;
 
-// 🔹 ШАХМАТНЫЕ ЧАСЫ
-export const initClock = CONFIG.initClock;
-export const tickClock = CONFIG.tickClock;
-export const makeMove = CONFIG.makeMove;
-export const formatClock = CONFIG.formatClock;
+export const GAME_BALANCE_WINDOW_TITLE = CONFIG.GAME_BALANCE_WINDOW_TITLE;
+export const GAME_BALANCE_JOIN_BUTTON = CONFIG.GAME_BALANCE_JOIN_BUTTON;
+export const GAME_BALANCE_CREATE_BUTTON = CONFIG.GAME_BALANCE_CREATE_BUTTON;
+export const GAME_BALANCE_INVITE_BUTTON = CONFIG.GAME_BALANCE_INVITE_BUTTON;
+export const createGameWithStake = CONFIG.createGameWithStake;
+export const joinGameWithStake = CONFIG.joinGameWithStake;
+export const useGameBalanceManager = CONFIG.useGameBalanceManager;
+export const publishGameToLobbyExtended = CONFIG.publishGameToLobbyExtended;
+export const getLobbyGamesExtended = CONFIG.getLobbyGamesExtended;
+export const generateGameInviteExtended = CONFIG.generateGameInviteExtended;
+export const sendInviteToChatExtended = CONFIG.sendInviteToChatExtended;
+export const canJoinGameExtended = CONFIG.canJoinGameExtended;
+export const initClockExtended = CONFIG.initClockExtended;
+export const tickClockExtended = CONFIG.tickClockExtended;
+export const makeMoveExtended = CONFIG.makeMoveExtended;
+export const checkTimeWin = CONFIG.checkTimeWin;
+export const formatClockExtended = CONFIG.formatClockExtended;
+export const processTimeWin = CONFIG.processTimeWin;
