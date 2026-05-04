@@ -1,7 +1,6 @@
 import { CONFIG_BASE } from './config-base';
 // 🔹 АКТИВНЫЕ ПАТЧИ (только рабочие)
 import { PATCH_026 } from './config-patch-026';
-import type { GameNotification } from './config-patch-026';
 
 // 🔹 КОНСТРУКТОР: Только то, что нужно
 export const CONFIG = {
@@ -48,7 +47,7 @@ export const SOCIAL_LINKS = CONFIG.SOCIAL_LINKS;
 export const YOUTUBE_SECTION_DESCRIPTION = CONFIG.YOUTUBE_SECTION_DESCRIPTION;
 export const EXTENDED_BOARD_THEMES = CONFIG.EXTENDED_BOARD_THEMES;
 export const PIECE_STYLES = CONFIG.PIECE_STYLES;
-export type GameNotification = typeof CONFIG.GameNotification;
+export type GameNotification = GameNotification;
 export const createNotification = CONFIG.createNotification;
 export const getNotifications = CONFIG.getNotifications;
 export const markNotificationRead = CONFIG.markNotificationRead;
@@ -93,3 +92,9 @@ export const makeMoveExtended = CONFIG.makeMoveExtended;
 export const checkTimeWin = CONFIG.checkTimeWin;
 export const formatClockExtended = CONFIG.formatClockExtended;
 export const processTimeWin = CONFIG.processTimeWin;
+
+// 🔹 ЭКСПОРТ ТИПОВ (без конфликтов)
+export type { GameNotification } from './config-patch-026';
+
+// 🔹 ЭКСПОРТ ТИПОВ (без конфликтов)
+export type { GameNotification } from './config-patch-026';
