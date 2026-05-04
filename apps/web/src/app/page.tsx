@@ -9,9 +9,8 @@ import {
   resetConnectionStates, getOnlineGames, getFriends, addFriend, processPayout,
   FIXED_CSS, injectGlobalStyles,
   VALID_STAKES, VALID_TIMES, validateGameConfig, createTokenGameSession, recordGameMove, getMyActiveGames,
-  MIN_STAKE, C4C_DECIMALS, useApproveC4C, useCreateTokenGame, useJoinTokenGame, generateGameInvite, sendInviteToChat, publishGameToLobby, canJoinGame,
-  ALLOWED_STAKES, validateExactStake, calculatePrizePool, formatPrizePool,
-  useClaimWinnings, useGameBalance, updateGameBalance
+  MIN_STAKE, C4C_DECIMALS, validateStake, ALLOWED_STAKES,
+  useApproveC4C, useCreateTokenGame, useJoinTokenGame, generateGameInvite, sendInviteToChat, publishGameToLobby, canJoinGame, formatPrizePool
 } from '@/lib/config'
 
 const PIECES: any = { p:{w:'♙',b:'♟'}, n:{w:'♘',b:'♞'}, b:{w:'♗',b:'♝'}, r:{w:'♖',b:'♜'}, q:{w:'♕',b:'♛'}, k:{w:'♔',b:'♚'} }
@@ -44,12 +43,9 @@ export default function Page() {
   const balanceResult = useBalance({ address, token: C4C_TOKEN_ADDRESS as `0x${string}`, query: { enabled: !!address && !!chain?.id && chain.id === CHAIN_ID } })
   const balance = balanceResult.data
 
-  // 🔹 Контрактные хуки
   const { approve: approveTokens, isPending: isApproving } = useApproveC4C()
-  const { create: createOnChain, txHash: createTxHash, isPending: isCreating, isSuccess: gameCreatedOnChain } = useCreateTokenGame()
-  const { join: joinOnChain, txHash: joinTxHash, isPending: isJoining, isSuccess: joinedOnChain } = useJoinTokenGame()
-  const { claim: claimWinnings, isPending: isClaiming, isSuccess: claimed } = useClaimWinnings()
-  const { balance: gameBalance, isLoading: balanceLoading } = useGameBalance(currentGame?.id || null)
+  const { create: createOnChain, isPending: isCreating } = useCreateTokenGame()
+  const { join: joinOnChain, isPending: isJoining } = useJoinTokenGame()
 
   useEffect(() => { if (isClient && FIXED_CSS) injectGlobalStyles(FIXED_CSS) }, [isClient])
   useEffect(() => { setIsClient(true)
@@ -89,77 +85,49 @@ export default function Page() {
   const updateProfile = (updates: any) => { const np = { ...profile, ...updates }; setProfile(np); saveProfileToStorage(np) }
   const handleConnect = async (connector: any) => { try { await connect({connector}); setShowModal(false) } catch { resetConnectionStates() } }
 
-  // 🔥 СОЗДАНИЕ ИГРЫ
   const handleCreateGame = async () => {
-    const check = validateExactStake(stake);
+    const check = validateStake(stake);
     if (!check.valid) { alert(`❌ ${check.error}`); return; }
     if (!address) { alert('🔗 Подключите кошелёк'); return; }
-
-    const confirmed = confirm(`🎮 Создать игру?\n⏱️ Время: ${formatTime(timeCtrl)}\n💰 Ваша ставка: ${formatC4C(stake)} C4C\n🏆 Призовой фонд: ${formatPrizePool(stake)}\n⚠️ Токены будут списаны в контракт.`)
+    const confirmed = confirm(`🎮 Создать игру?\n💰 Ваша ставка: ${formatC4C(stake)} C4C\n🏆 Призовой фонд: ${formatPrizePool(stake)}\n⚠️ Токены будут списаны.`)
     if (!confirmed) return;
-
     try {
-      await createOnChain(timeCtrl, stake);
-      const game = createTokenGameSession(address, stake, timeCtrl);
-      (game as any).txHash = createTxHash || 'pending';
-      (game as any).balance = stake;
-      publishGameToLobby(game);
-      alert(`✅ Игра создана!\n🏆 Призовой фонд: ${formatPrizePool(stake)}\n🔗 Ссылка скопирована!`);
+      await approveTokens(stake); await createOnChain(timeCtrl, stake);
+      const game = createTokenGameSession(address, stake, timeCtrl); (game as any).balance = stake; publishGameToLobby(game);
+      alert(`✅ Игра создана!\n🏆 Фонд: ${formatPrizePool(stake)}\n🔗 Ссылка скопирована!`);
       if (navigator.clipboard) navigator.clipboard.writeText(`${window.location.origin}/?join=${game.id}`);
       setGames(getOnlineGames());
     } catch (e: any) { alert(`❌ Ошибка: ${e.message || 'Не удалось создать игру'}`); }
   };
 
-  // 🔥 ПРИСОЕДИНЕНИЕ К ИГРЕ
   const handleJoinGame = async (game: any) => {
     if (!address) return alert('🔗 Подключите кошелёк');
-    const { canJoin, reason } = await canJoinGame(game.id, address, game.stake);
-    if (!canJoin) return alert(`❌ ${reason}`);
-
-    const confirmed = confirm(`Присоединиться?\n💰 Ставка: ${formatC4C(game.stake)} C4C\n🏆 Фонд: ${formatPrizePool(game.stake)}`);
-    if (!confirmed) return;
-
-    try { 
-      await joinOnChain(game.id); 
-      updateGameBalance(game.id, game.stake * 2);
-      alert('✅ Вы в игре! Токены списаны.');
-      setGames(getOnlineGames());
-    } catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
-  };
-
-  // 🔥 ЗАБРАТЬ ВЫИГРЫШ
-  const handleClaimWinnings = async (game: any) => {
-    if (!address) return alert('🔗 Подключите кошелёк');
-    const confirmed = confirm(`🏆 Забрать выигрыш ${formatPrizePool(game.stake)}?\nТокены будут переведены на ваш кошелёк.`);
-    if (!confirmed) return;
-    try {
-      await claimWinnings(game.id);
-      alert('💰 Выигрыш зачислен!');
-      setOver(null); setCurrentGame(null);
-    } catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
+    const { canJoin: ok, reason } = await canJoinGame(game.id, address, game.stake);
+    if (!ok) return alert(`❌ ${reason}`);
+    if (!confirm(`Присоединиться? Ставка: ${formatC4C(game.stake)} C4C`)) return;
+    try { await joinOnChain(game.id); alert('✅ Вы в игре!'); setGames(getOnlineGames()); } catch (e: any) { alert(`❌ Ошибка: ${e.message}`); }
   };
 
   const click = (sq: string) => {
     if (over) return; if (selected === sq) { setSelected(null); setPossibleMoves([]); return }
-    const g = new Chess(fen)
-    if (selected) { try { const m = g.move({ from: selected as any, to: sq as any, promotion: 'q' }); if (m) { setFen(g.fen()); setSelected(null); setPossibleMoves([]); if(currentGame) recordGameMove(currentGame.id, m.san, g.pgn()); setMoveHistory([...moveHistory, m.san]); if (g.isCheckmate()) { setOver('⚪ Вы победили!'); } return } } catch {} }
+    const g = new Chess(fen);
+    if (selected) { try { const m = g.move({ from: selected as any, to: sq as any, promotion: 'q' }); if (m) { setFen(g.fen()); setSelected(null); setPossibleMoves([]); if (g.isCheckmate()) { setOver('⚪ Вы победили!'); processPayout(address||'',stake) } return } } catch {} }
     const piece = g.get(sq as any); if (piece && piece.color === g.turn()) { setSelected(sq); setPossibleMoves(g.moves({ square: sq as any, verbose: true }).map((m:any)=>m.to)) } else { setSelected(null); setPossibleMoves([]) }
   }
   const reset = () => { setFen(new Chess().fen()); setSelected(null); setPossibleMoves([]); setWTime(timeCtrl); setBTime(timeCtrl); setOver(null); setCurrentGame(null); setMoveHistory([]) }
   const g = new Chess(fen)
-
   const L = profile.lang || 'ru'
   const tr = (key: string) => (UI_TRANSLATE as any)?.(L, key) || key
 
-  if (!isClient) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text)'}}>{tr('loading')}</div>
+  if (!isClient) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text)'}}>⏳</div>
   if (!isConnected) return <div style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)',padding:20,display:'flex',flexDirection:'column',alignItems:'center',textAlign:'center'}}>
     <h1 style={{fontSize:36,marginBottom:16}}>♟️{APP_NAME}</h1>
-    <button onClick={()=>setShowModal(true)} disabled={isPending} style={{padding:'16px 48px',background:isPending?'#6b7280':'var(--accent)',borderRadius:12,fontSize:18}}>{isPending?'⏳...':tr('connect')}</button>
+    <button onClick={()=>setShowModal(true)} disabled={isPending} style={{padding:'16px 48px',background:isPending?'#6b7280':'var(--accent)',borderRadius:12,fontSize:18}}>{isPending?'⏳...':'🔗 Войти'}</button>
     {showModal && <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setShowModal(false)}>
       <div style={{background:'var(--card)',padding:24,borderRadius:16,maxWidth:360,width:'100%'}} onClick={(e:any)=>e.stopPropagation()}>
-        <h3 style={{textAlign:'center',marginBottom:20}}>{tr('chooseWallet')}</h3>
+        <h3 style={{textAlign:'center',marginBottom:20}}>Выберите кошелёк</h3>
         {connectors.map((c:any)=><button key={c.id} onClick={()=>handleConnect(c)} disabled={isPending} style={{width:'100%',padding:14,margin:'8px 0',background:'#3b82f6',color:'#fff',borderRadius:10}}>{c.name}</button>)}
-        <button onClick={()=>setShowModal(false)} style={{width:'100%',padding:12,marginTop:16,background:'var(--border)',borderRadius:8}}>{tr('close')}</button>
+        <button onClick={()=>setShowModal(false)} style={{width:'100%',padding:12,marginTop:16,background:'var(--border)',borderRadius:8}}>Закрыть</button>
       </div>
     </div>}
   </div>
@@ -168,13 +136,12 @@ export default function Page() {
     <div style={{maxWidth:700,margin:'0 auto'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
         <h1 style={{display:'flex',alignItems:'center',gap:8}}>{profile.avatar ? <img src={profile.avatar} style={{width:32,height:32,borderRadius:'50%',border:'2px solid var(--accent)'}}/> : '♟️'} {APP_NAME}</h1>
-        <button onClick={()=>disconnect()} style={{background:'var(--error)',padding:'8px 16px',borderRadius:6,color:'#fff'}}>{tr('logout')}</button>
+        <button onClick={()=>disconnect()} style={{background:'var(--error)',padding:'8px 16px',borderRadius:6,color:'#fff'}}>Выйти</button>
       </div>
       <div style={{display:'flex',gap:8,marginBottom:16}}>
-        {['profile','lobby','friends'].map((tabKey:string)=><button key={tabKey} onClick={()=>setTab(tabKey)} style={{flex:1,padding:10,background:tab===tabKey?'var(--accent)':'var(--card)',borderRadius:8,color:tab===tabKey?'#000':'var(--text)'}}>{tabKey==='profile'?tr('profile'):tabKey==='lobby'?tr('lobby'):tr('friends')}</button>)}
+        {['profile','lobby','friends'].map((tabKey:string)=><button key={tabKey} onClick={()=>setTab(tabKey)} style={{flex:1,padding:10,background:tab===tabKey?'var(--accent)':'var(--card)',borderRadius:8,color:tab===tabKey?'#000':'var(--text)'}}>{tabKey==='profile'?'👤 Профиль':tabKey==='lobby'?'🎲 Лобби':'👥 Друзья'}</button>)}
       </div>
 
-      {/* 🔹 ПРОФИЛЬ */}
       {tab==='profile' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
         <div style={{display:'flex',gap:16,alignItems:'flex-start',marginBottom:16}}>
           <label style={{width:80,height:80,borderRadius:'50%',background:'var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',overflow:'hidden',border:'3px solid var(--accent)'}}>
@@ -183,90 +150,38 @@ export default function Page() {
           </label>
           <div style={{flex:1}}>
             <input value={profile.name} onChange={(e:any)=>updateProfile({name:e.target.value})} placeholder="Ваше имя" style={{padding:10,fontWeight:600,marginBottom:6}}/>
-            <p style={{fontSize:13,opacity:.7}}>{tr('balance')}: <span style={{fontSize:18,fontWeight:'bold',color:'var(--accent)'}}>{formatC4C(balance?.value)} C4C</span></p>
-            {/* 🔥 КНОПКА ПОКУПКИ C4C */}
-            <a href={C4C_BUY_URL} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',marginTop:8,padding:'8px 16px',background:'linear-gradient(135deg,#ec4899,#db2777)',color:'#fff',textDecoration:'none',borderRadius:8,fontSize:13}}>🛒 Купить C4C на Pink.Meme</a>
+            <p style={{fontSize:13,opacity:.7}}>Баланс: <span style={{fontSize:18,fontWeight:'bold',color:'var(--accent)'}}>{formatC4C(balance?.value)} C4C</span></p>
+            <a href={C4C_BUY_URL} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',marginTop:8,padding:'8px 16px',background:'linear-gradient(135deg,#ec4899,#db2777)',color:'#fff',textDecoration:'none',borderRadius:8,fontSize:13}}>🛒 Купить C4C</a>
           </div>
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <label style={{fontSize:12,opacity:.7}}>{tr('desc')}</label>
-          <textarea value={profile.description||''} onChange={(e:any)=>updateProfile({description:e.target.value.slice(0,500)})} rows={3} style={{resize:'none'}}/>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-            <input value={profile.link1Name||''} onChange={(e:any)=>updateProfile({link1Name:e.target.value})} placeholder="Ссылка 1"/>
-            <input value={profile.link1Url||''} onChange={(e:any)=>updateProfile({link1Url:e.target.value})} placeholder="https://..."/>
-            <input value={profile.link2Name||''} onChange={(e:any)=>updateProfile({link2Name:e.target.value})} placeholder="Ссылка 2"/>
-            <input value={profile.link2Url||''} onChange={(e:any)=>updateProfile({link2Url:e.target.value})} placeholder="https://..."/>
-          </div>
-          <label style={{fontSize:12,opacity:.7}}>{tr('theme')}</label>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{Object.entries(UI_THEMES || {}).map(([id, theme]:any)=>(<button key={id} onClick={()=>updateProfile({theme:id})} style={{flex:1,padding:6,borderRadius:6,background:theme.bg,color:theme.text,border:profile.theme===id?'3px solid var(--accent)':'1px solid var(--border)'}}>{theme.name}</button>))}</div>
-          <label style={{fontSize:12,opacity:.7}}>🌐 Язык</label>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{Object.entries(UI_LANGS || {}).map(([id, lang]:any)=>(<button key={id} onClick={()=>updateProfile({lang:id})} style={{flex:1,padding:6,borderRadius:6,background:'var(--card)',border:profile.lang===id?'2px solid var(--accent)':'1px solid var(--border)'}}>{lang.flag} {lang.name}</button>))}</div>
-          <label style={{fontSize:12,opacity:.7}}>♟️ Доска</label>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{Object.entries(UI_BOARDS || {}).map(([id, board]:any)=>(<button key={id} onClick={()=>updateProfile({boardTheme:id})} style={{width:36,height:20,borderRadius:4,background:`linear-gradient(135deg,${board.light},${board.dark})`,border:profile.boardTheme===id?'3px solid var(--accent)':'1px solid var(--border)'}} title={id}/>))}</div>
-
-          {/* 🔥 ВЫБОР СТАВКИ + ПРИЗОВОЙ ФОНД */}
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:4}}>
-            <div><label style={{fontSize:12,opacity:.7}}>💰 Ставка</label>
-              <select value={stake} onChange={(e:any)=>setStake(Number(e.target.value))} style={{width:'100%',padding:8,marginTop:4,borderRadius:6}}>
-                {ALLOWED_STAKES.map(val => <option key={val} value={val}>{val.toLocaleString()} C4C</option>)}
-              </select>
-            </div>
-            <div><label style={{fontSize:12,opacity:.7}}>🏆 Призовой фонд</label>
-              <div style={{padding:8,marginTop:4,background:'var(--bg)',borderRadius:6,fontWeight:'bold',color:'var(--accent)'}}>{formatPrizePool(stake)}</div>
-            </div>
-          </div>
-
-          <button onClick={handleCreateGame} disabled={isCreating || isApproving} style={{width:'100%',padding:12,marginTop:8,background:'var(--success)',color:'#fff',borderRadius:8,fontWeight:600}}>
-            {(isCreating || isApproving) ? '⏳ Обработка...' : '🎮 Создать игру на токены'}
-          </button>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:4}}>
+          <div><label style={{fontSize:12,opacity:.7}}>💰 Ставка</label><select value={stake} onChange={(e:any)=>setStake(Number(e.target.value))} style={{width:'100%',padding:8,marginTop:4,borderRadius:6}}>{ALLOWED_STAKES.map(val => <option key={val} value={val}>{val.toLocaleString()} C4C</option>)}</select></div>
+          <div><label style={{fontSize:12,opacity:.7}}>🏆 Призовой фонд</label><div style={{padding:8,marginTop:4,background:'var(--bg)',borderRadius:6,fontWeight:'bold',color:'var(--accent)'}}>{formatPrizePool(stake)}</div></div>
         </div>
+        <button onClick={handleCreateGame} disabled={isCreating || isApproving} style={{width:'100%',padding:12,marginTop:8,background:'var(--success)',color:'#fff',borderRadius:8,fontWeight:600}}>{(isCreating || isApproving) ? '⏳ Обработка...' : '🎮 Создать игру на токены'}</button>
       </div>}
 
-      {/* 🔹 ЛОББИ — с балансом игры */}
       {tab==='lobby' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
-        <h3 style={{marginBottom:12}}>{tr('lobby')}</h3>
-        {games.length===0 ? <p style={{opacity:.7}}>{tr('noGames')}</p> : games.map((game:any)=>{
-          const prize = formatPrizePool(game.stake);
-          const bal = (game.balance || game.stake).toLocaleString();
-          return (<div key={game.id} style={{padding:10,background:'var(--bg)',borderRadius:8,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <div><p style={{fontWeight:600}}>🎮 {game.id.slice(0,12)}... | 🏆 {prize}</p>
-            <p style={{fontSize:12,opacity:.6}}>{tr('stake')}: {formatC4C(game.stake)} | {tr('time')}: {formatTime(game.timeControl)} | 👤 {game.creator.slice(2,6)}... | 💰 Баланс: {bal} C4C</p></div>
+        <h3 style={{marginBottom:12}}>🎲 Лобби</h3>
+        {games.length===0 ? <p style={{opacity:.7}}>Нет игр</p> : games.map((game:any)=>(
+          <div key={game.id} style={{padding:10,background:'var(--bg)',borderRadius:8,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div><p style={{fontWeight:600}}>🎮 {game.id.slice(0,12)}... | 🏆 {formatPrizePool(game.stake)}</p>
+            <p style={{fontSize:12,opacity:.6}}>Ставка: {formatC4C(game.stake)} | Время: {formatTime(game.timeControl)} | 👤 {game.creator.slice(2,6)}... | 💰 Баланс: {(game.balance||game.stake).toLocaleString()} C4C</p></div>
             <div style={{display:'flex',gap:6}}>
               <button onClick={()=>handleJoinGame(game)} disabled={isJoining} style={{padding:'6px 14px',background:'#3b82f6',color:'#fff',borderRadius:6}}>{isJoining?'⏳...':'▶️ Играть'}</button>
-              {game.creator.toLowerCase() === address?.toLowerCase() && (<button onClick={()=>{const inv = generateGameInvite(game.id, profile.name||'Player', game.stake, game.timeControl); if(friends[0]) { sendInviteToChat(friends[0].address, inv); alert(`📩 Отправлено ${friends[0].name}!`); } else if(navigator.clipboard) { navigator.clipboard.writeText(inv.link); alert('🔗 Ссылка скопирована!'); }}} style={{padding:'6px 14px',background:'#10b981',color:'#fff',borderRadius:6}}>📩</button>)}
+              {game.creator.toLowerCase() === address?.toLowerCase() && (<button onClick={()=>{const inv = generateGameInvite(game.id, profile.name||'Player', game.stake, game.timeControl); if(friends[0]) { sendInviteToChat(friends[0].address, inv); alert(`📩 Отправлено ${friends[0].name}!`); } else if(navigator.clipboard) { navigator.clipboard.writeText(inv.copy); alert('🔗 Ссылка скопирована!'); }}} style={{padding:'6px 14px',background:'#10b981',color:'#fff',borderRadius:6}}>📩</button>)}
             </div>
-          </div>);
-        })}
+          </div>))}
       </div>}
 
-      {/* 🔹 ДРУЗЬЯ */}
       {tab==='friends' && <div style={{background:'var(--card)',padding:20,borderRadius:16}}>
-        <h3 style={{marginBottom:12}}>{tr('friends')}</h3>
-        <div style={{display:'flex',gap:8,marginBottom:12}}><input value={newFriendAddr} onChange={(e:any)=>setNewFriendAddr(e.target.value)} placeholder="Адрес"/><button onClick={()=>{if(newFriendAddr.length>3){addFriend({address:newFriendAddr,name:`Friend ${newFriendAddr.slice(2,6)}`,status:'online',addedAt:Date.now()});setFriends(getFriends());setNewFriendAddr('')}}} style={{background:'#3b82f6',color:'#fff',padding:'0 16px',borderRadius:6}}>{tr('addFriend')}</button></div>
-        {friends.length===0 ? <p style={{opacity:.7}}>{tr('noFriends')}</p> : friends.map((f:any)=>(<div key={f.address} style={{padding:10,background:'var(--bg)',borderRadius:8,marginBottom:6,display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>{f.name}</span><button onClick={()=>alert(`${tr('invite')} ${f.name}`)} style={{padding:'4px 10px',background:'var(--success)',color:'#fff',borderRadius:4,fontSize:12}}>{tr('invite')}</button></div>))}
+        <h3 style={{marginBottom:12}}>👥 Друзья</h3>
+        <div style={{display:'flex',gap:8,marginBottom:12}}><input value={newFriendAddr} onChange={(e:any)=>setNewFriendAddr(e.target.value)} placeholder="Адрес"/><button onClick={()=>{if(newFriendAddr.length>3){addFriend({address:newFriendAddr,name:`Friend ${newFriendAddr.slice(2,6)}`,status:'online',addedAt:Date.now()});setFriends(getFriends());setNewFriendAddr('')}}} style={{background:'#3b82f6',color:'#fff',padding:'0 16px',borderRadius:6}}>➕</button></div>
+        {friends.length===0 ? <p style={{opacity:.7}}>Нет друзей</p> : friends.map((f:any)=>(<div key={f.address} style={{padding:10,background:'var(--bg)',borderRadius:8,marginBottom:6,display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>{f.name}</span><button onClick={()=>alert(`📩 ${f.name}`)} style={{padding:'4px 10px',background:'var(--success)',color:'#fff',borderRadius:4,fontSize:12}}>📩</button></div>))}
       </div>}
 
-      {/* 🔹 ДОСКА + БАЛАНС ИГРЫ */}
       <div style={{marginTop:16,background:'var(--card)',padding:16,borderRadius:16}}>
-        {currentGame && (
-          <div style={{marginBottom:12,padding:10,background:'var(--bg)',borderRadius:8}}>
-            <p style={{fontSize:14,fontWeight:600}}>🎮 Игра: {currentGame.id}</p>
-            <p style={{fontSize:12,opacity:.7}}>
-              Ставка: {formatC4C(currentGame.stake)} C4C | 
-              🏆 Баланс игры: {(gameBalance || (currentGame as any).balance || 0).toLocaleString()} C4C | 
-              Время: {formatTime(currentGame.timeControl)}
-            </p>
-            {over && (
-              <button onClick={()=>handleClaimWinnings(currentGame)} disabled={isClaiming} style={{marginTop:8,padding:'6px 16px',background:'var(--success)',color:'#fff',borderRadius:6}}>
-                {isClaiming ? '⏳...' : '🏆 Забрать выигрыш'}
-              </button>
-            )}
-          </div>
-        )}
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-          <h3>{tr('board')}</h3>
-          <div style={{display:'flex',gap:8}}><select value={timeCtrl} onChange={(e:any)=>setTimeCtrl(Number(e.target.value))} style={{padding:6,borderRadius:6}}>{TIME_OPTIONS.map((o:any)=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-        </div>
+        {currentGame && <div style={{marginBottom:12,padding:10,background:'var(--bg)',borderRadius:8}}><p style={{fontSize:14,fontWeight:600}}>🎮 Игра: {currentGame.id}</p><p style={{fontSize:12,opacity:.7}}>Баланс игры: {formatPrizePool(currentGame.stake)}</p></div>}
         <div style={{display:'grid',gridTemplateColumns:'repeat(8,1fr)',gap:0,maxWidth:360,margin:'0 auto',borderRadius:8,overflow:'hidden',boxShadow:'0 4px 12px rgba(0,0,0,.4)'}}>
           {['8','7','6','5','4','3','2','1'].map((r,ri)=>['a','b','c','d','e','f','g','h'].map((f,fi)=>{
             const sq=f+r; const p=g.get(sq as any); const boardT = (UI_BOARDS as any)[profile.boardTheme] || (UI_BOARDS as any).blue; const bg=(fi+ri)%2===0 ? boardT.light : boardT.dark
@@ -279,8 +194,7 @@ export default function Page() {
             </div>
           }))}
         </div>
-        {moveHistory.length > 0 && <div style={{marginTop:12,maxHeight:80,overflowY:'auto',background:'var(--bg)',padding:8,borderRadius:6,fontSize:12}}><strong>📜 Ходы:</strong> {moveHistory.join(' ')}</div>}
-        <div style={{textAlign:'center',marginTop:12}}>{over && <p style={{color:'var(--error)',fontWeight:'bold',fontSize:16}}>{over}</p>}<button onClick={reset} style={{padding:'8px 20px',background:'#3b82f6',color:'#fff',borderRadius:6}}>{tr('newGame')}</button></div>
+        <div style={{textAlign:'center',marginTop:12}}>{over && <p style={{color:'var(--error)',fontWeight:'bold',fontSize:16}}>{over}</p>}<button onClick={reset} style={{padding:'8px 20px',background:'#3b82f6',color:'#fff',borderRadius:6}}>🔄 Новая игра</button></div>
       </div>
     </div>
   </div>
