@@ -57,7 +57,7 @@ export default function ChessApp() {
   const [newFriendAddr, setNewFriendAddr] = useState('')
   const [clock, setClock] = useState<any>(null)
   const [createGameTxHash, setCreateGameTxHash] = useState<`0x${string}` | null>(null)
-  const {  receipt: createGameReceipt, isLoading: isCreateGameConfirming } =   const { data: createGameReceipt, isLoading: isCreateGameConfirming } = useWaitForTransactionReceipt({
+  const {  createGameReceipt, isLoading: isCreateGameConfirming } = useWaitForTransactionReceipt({
     hash: createGameTxHash || undefined,
     chainId: 56,
     query: { enabled: !!createGameTxHash }
