@@ -739,16 +739,20 @@ export default function ChessApp() {
       </div>
     </div>
   )
-}  const handleCreateGame = async () => {
-    if (!validateStake(stake)) return alert('❌ Выбери ставку из списка')
+}
+  const handleCreateGame = async () => {
+    if (!validateStake(stake)) return alert('❌ Выбери ставку')
     if (!address) return alert('🔗 Подключи кошелёк')
-    if (!confirm(`🎮 Создать игру?
-💰 Ставка: ${formatC4C(stake)} C4C
-🏆 Фонд: ${formatPrizePool(stake)}
-⚠️ Токены спишутся в контракт.`)) return
-    
+    if (!confirm(`Создать игру на ${stake} C4C?`)) return
     try {
-      // 1. Аппрув токена C4C
+      writeApprove({ address: '0xaac20575371de01b4d10c4e7566d5453d72d56e7' as `0x${string}`, abi: ['function approve(address,uint256)external returns(bool)'] as const, functionName: 'approve', args: ['0xCf5E5d01ADd5e2Ba62B2f6747E5CFC43e36D5005' as `0x${string}`, BigInt(Math.floor(stake*1e6))], chainId: 56 })
+      writeCreate({ address: '0xCf5E5d01ADd5e2Ba62B2f6747E5CFC43e36D5005' as `0x${string}`, abi: ['function createGame(uint256,uint256)external'] as const, functionName: 'createGame', args: [BigInt(timeCtrl), BigInt(Math.floor(stake*1e6))], chainId: 56 })
+      const g = { id: `g_${Date.now()}`, creator: address, stake, timeCtrl, status: 'waiting', balance: stake }
+      publishGameToLobby(g); setCurrentGame(g); setClock(initClock(timeCtrl)); setGames(getLobbyGames())
+      alert('✅ Игра создана!')
+    } catch (e: any) { alert('❌ ' + (e.message || 'Ошибка')) }
+  }
+
       const approveHash = writeApprove({
         address: '0xaac20575371de01b4d10c4e7566d5453d72d56e7' as `0x${string}`,
         abi: ['function approve(address spender, uint256 amount) external returns (bool)'] as const,
@@ -841,8 +845,7 @@ export default function ChessApp() {
       setClock(initClock(timeCtrl));
       setGames(getLobbyGames());
       alert('✅ Игра создана! Токены в балансе игры.');
-    }
-  } catch (err: any) {
+    } catch (err: any) {
     console.error('CreateGame Error:', err);
     alert(`❌ Ошибка: ${err.message || 'Транзакция отменена или упала'}`);
   }
