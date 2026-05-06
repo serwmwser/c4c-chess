@@ -748,18 +748,6 @@ export default function ChessApp() {
     } catch (e: any) { alert('❌ ' + (e.message || 'Ошибка')) }
   }
 
-  const handleCreateGame = async () => {
-    if (!validateStake(stake)) return alert('❌ Выбери ставку')
-    if (!address) return alert('🔗 Подключи кошелёк')
-    if (!confirm(`Создать игру на ${stake} C4C?`)) return
-    try {
-      writeApprove({ address: '0xaac20575371de01b4d10c4e7566d5453d72d56e7' as `0x${string}`, abi: ['function approve(address,uint256)external returns(bool)'] as const, functionName: 'approve', args: ['0xCf5E5d01ADd5e2Ba62B2f6747E5CFC43e36D5005' as `0x${string}`, BigInt(Math.floor(stake*1e6))], chainId: 56 })
-      writeCreate({ address: '0xCf5E5d01ADd5e2Ba62B2f6747E5CFC43e36D5005' as `0x${string}`, abi: ['function createGame(uint256,uint256)external'] as const, functionName: 'createGame', args: [BigInt(timeCtrl), BigInt(Math.floor(stake*1e6))], chainId: 56 })
-      const g = { id: `g_${Date.now()}`, creator: address, stake, timeCtrl, status: 'waiting', balance: stake }
-      publishGameToLobby(g); setCurrentGame(g); setClock(initClock(timeCtrl)); setGames(getLobbyGames())
-      alert('✅ Игра создана!')
-    } catch (e: any) { alert('❌ ' + (e.message || 'Ошибка')) }
-  }
 
       const g = { id: `g_${Date.now()}`, creator: address, stake, timeCtrl, status: 'waiting', balance: stake }
       publishGameToLobby(g); setCurrentGame(g); setClock(initClock(timeCtrl)); setGames(getLobbyGames())
