@@ -740,3 +740,47 @@ export default function ChessApp() {
     </div>
   )
 }
+
+const handleCreateGame = async () => {
+  if (!validateStake(stake)) return alert('❌ Выбери ставку из списка');
+  if (!address) return alert('🔗 Подключи кошелёк');
+  if (!confirm(`🎮 Создать игру?\n💰 Ставка: ${formatC4C(stake)} C4C\n🏆 Фонд: ${formatPrizePool(stake)}\n⚠️ Токены спишутся в контракт.`)) return;
+  
+  try {
+    // 1. Аппрув
+    const approveHash = writeApprove({
+      address: '0xaac20575371de01b4d10c4e7566d5453d72d56e7' as `0x${string}`,
+      abi: ['function approve(address spender, uint256 amount) external returns (bool)'] as const,
+      functionName: 'approve',
+      args: ['0xCf5E5d01ADd5e2Ba62B2f6747E5CFC43e36D5005' as `0x${string}`, BigInt(stake * 1000000)],
+      chainId: 56
+    });
+    alert('⏳ Подтверди APPROVE в MetaMask...');
+    
+    // 2. Ожидание подтверждения аппрува
+    if (!approveHash) throw new Error('Транзакция approve не отправлена');
+    alert('✅ APPROVE подтверждён. Создаю игру...');
+    
+    // 3. Создание игры
+    const createHash = writeCreate({
+      address: '0xCf5E5d01ADd5e2Ba62B2f6747E5CFC43e36D5005' as `0x${string}`,
+      abi: ['function createGame(uint256 time, uint256 stake) external'] as const,
+      functionName: 'createGame',
+      args: [BigInt(timeCtrl), BigInt(stake * 1000000)],
+      chainId: 56
+    });
+    alert('⏳ Подтверди CREATE GAME в MetaMask...');
+    
+    if (createHash) {
+      const g = { id: `g_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, creator: address, stake, timeCtrl, status: 'waiting', balance: stake };
+      publishGameToLobby(g);
+      setCurrentGame(g);
+      setClock(initClock(timeCtrl));
+      setGames(getLobbyGames());
+      alert('✅ Игра создана! Токены в балансе игры.');
+    }
+  } catch (err: any) {
+    console.error('CreateGame Error:', err);
+    alert(`❌ Ошибка: ${err.message || 'Транзакция отменена или упала'}`);
+  }
+}
