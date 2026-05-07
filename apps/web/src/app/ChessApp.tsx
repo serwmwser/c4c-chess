@@ -100,7 +100,7 @@ export default function ChessApp() {
     const timer = setInterval(() => setClock((prev: any) => prev ? tickClock(prev) : prev), 1000)
     
   }
-  }
+
 return () => clearInterval(timer)
   }, [clock?.active, clock?.finished])
   
@@ -173,12 +173,12 @@ return () => clearInterval(timer)
     const reader = new FileReader()
     reader.onloadend = () => updateProfile({ avatar: reader.result })
     reader.readAsDataURL(file)
-  }
+
   const updateProfile = (updates: any) => { 
     const np = { ...profile, ...updates }
     setProfile(np)
     saveProfileToStorage(np)
-  }
+
   const handleConnect = async (connector: any) => { 
     try { 
       await connect({ connector })
@@ -256,9 +256,7 @@ return () => clearInterval(timer)
         </p>
       </div>
     )
-  }
-  
-  
+
   const balanceDisplay = balanceLoading ? '⏳' : balance?.formatted || "0.00"
   
   return (
@@ -582,7 +580,6 @@ return () => clearInterval(timer)
                             }
                             if (!isJoining) {
                               await joinTokenGame(g.id)
-                            }
 
                             const started = await checkAndStartGame(updatedGame.id)
                             if (started) {
@@ -795,4 +792,7 @@ return () => clearInterval(timer)
     }
   }
 
+}
+}
+}
 }
