@@ -258,6 +258,10 @@ return () => clearInterval(timer)
 
   const balanceDisplay = balanceLoading ? '⏳' : balance?.formatted || "0.00"
   
+
+  }
+  }
+  }
   return (
     <div style={{minHeight:'100vh', background:'var(--bg)', color:'var(--text)', padding:20}}>
       <div style={{maxWidth:700, margin:'0 auto'}}>
@@ -791,7 +795,5 @@ return () => clearInterval(timer)
     }
   }
 
-}
-}
 }
 }
