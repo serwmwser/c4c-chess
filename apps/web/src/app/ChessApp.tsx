@@ -17,6 +17,7 @@ import {
 } from '@/lib/config'
 import type { GameNotification } from '@/lib/config'
 
+type PendingGame = { id: string; stake: number; timeCtrl: number; creator: `0x${string}` }
 
 const C4C_TOKEN = '0xaac20575371de01b4d10c4e7566d5453d72d56e7' as `0x${string}`
 const CHAIN_ID = 56
@@ -59,6 +60,7 @@ export default function ChessApp() {
   const [newFriendAddr, setNewFriendAddr] = useState('')
   const [clock, setClock] = useState<any>(null)
   const [createGameTxHash, setCreateGameTxHash] = useState<`0x${string}` | null>(null)
+  const [pendingGame, setPendingGame] = useState<PendingGame | null>(null)
   const { data: createGameReceipt, isLoading: isCreateGameConfirming } = useWaitForTransactionReceipt({
     hash: createGameTxHash || undefined,
     chainId: 56,
@@ -172,11 +174,13 @@ return () => clearInterval(timer)
     const reader = new FileReader()
     reader.onloadend = () => updateProfile({ avatar: reader.result })
     reader.readAsDataURL(file)
+  }
 
   const updateProfile = (updates: any) => { 
     const np = { ...profile, ...updates }
     setProfile(np)
     saveProfileToStorage(np)
+  }
 
   const handleConnect = async (connector: any) => { 
     try { 
@@ -255,13 +259,11 @@ return () => clearInterval(timer)
         </p>
       </div>
     )
+  }
 
-  const balanceDisplay = balanceLoading ? '⏳' : balance?.formatted || "0.00"
+  const balanceDisplay = balanceLoading ? '⏳' : (balance ? balance.formatted : "0.00");
   
 
-  }
-  }
-  }
   return (
     <div style={{minHeight:'100vh', background:'var(--bg)', color:'var(--text)', padding:20}}>
       <div style={{maxWidth:700, margin:'0 auto'}}>
@@ -428,9 +430,7 @@ return () => clearInterval(timer)
                 <li>Подключить кошелёк → выбрать время и ставку → подтвердить approve и createGame.</li>
                 <li>Игра появится в лобби в статусе ожидания → дождаться соперника или пригласить друга.</li>
                 <li>Игра начнётся только когда оба игрока онлайн → будет звук, всплывающее окно и переход к доске.</li>
-                <li>Первый онлайн получает ⚪️ белые;
-  type PendingGame = { id: string; stake: number; timeCtrl: number; creator: `0x${string}` }
-  const [pendingGame, setPendingGame] = useState<PendingGame | null>(null) оба онлайн одновременно → цвета назначаются случайно.</li>
+                <li>Первый онлайн получает ⚪️ белые; оба онлайн одновременно → цвета назначаются случайно.</li>
                 <li>Победа по времени/мату → выигрыш; ничья → возврат ставок.</li>
               </ol>
             </details>
@@ -583,6 +583,7 @@ return () => clearInterval(timer)
                             }
                             if (!isJoining) {
                               await joinTokenGame(g.id)
+                            }
 
                             const started = await checkAndStartGame(updatedGame.id)
                             if (started) {
@@ -795,5 +796,4 @@ return () => clearInterval(timer)
     }
   }
 
-}
 }
