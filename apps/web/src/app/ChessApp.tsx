@@ -81,17 +81,28 @@ export default function ChessApp() {
   const { join: joinTokenGame } = useJoinTokenGame()
   
   
-  useEffect(() => { if (FIXED_CSS) injectGlobalStyles(FIXED_CSS) }, [])
   useEffect(() => {
     if (!address) return  // 🔹 Ждём подключения кошелька
+    
     const saved = loadProfileFromStorage()
-    if (saved && address) setProfile({ ...saved, id: address })
-    else if (address) setProfile((p:any) => ({ ...p, id: address, name: p.name || `Player_${address?.slice(2,8)}` })) setProfile({ ...saved, id: address })
-    else if (address) setProfile((p:any) => ({ ...p, id: address, name: p.name || `Player_${address?.slice(2,8)}` }))
+    if (saved && address) {
+      setProfile({ ...saved, id: address })
+    } else if (address) {
+      setProfile((p: any) => ({ 
+        ...p, 
+        id: address, 
+        name: p.name || `Player_${address?.slice(2, 8)}` 
+      }))
+    }
+    
     setGames(getLobbyGames())
     setFriends(getFriends())
-    setNotifications(getNotifications(notificationFilter))
-  }, [address])
+    
+    // 🔹 Сохраняем профиль при изменении
+    return () => {
+      if (profile?.id) saveProfileToStorage(profile)
+    }
+  }, [address, profile])
   useEffect(() => { 
     setNotifications(getNotifications(notificationFilter))
   }, [notificationFilter])
