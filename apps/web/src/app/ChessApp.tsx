@@ -594,15 +594,8 @@ return () => clearInterval(timer)
                     players: [address],
                     startAt: 0
                   }
-
-                  setIsApproving(true)
                   await approve(stake)
-                  setIsApproving(false)
-                  
-                  setIsCreating(true)
                   await createTokenGame(timeCtrl, stake)
-                  setIsCreating(false)
-
                   publishGameToLobby(gameData)
                   setGames(getLobbyGames())
                   createNotification({
@@ -622,8 +615,6 @@ return () => clearInterval(timer)
                   alert('✅ Игра создана и приглашение скопировано в буфер обмена!')
                   setTab('lobby')
                 } catch (error) {
-                  setIsApproving(false)
-                  setIsCreating(false)
                   console.error('Ошибка создания игры:', error)
                   alert('❌ Ошибка создания игры')
                 }
@@ -718,15 +709,8 @@ return () => clearInterval(timer)
                               createdAt: Date.now()
                             })
                             setNotifications(getNotifications(notificationFilter))
-
-                            setIsApproving(true)
                             await approve(g.stake)
-                            setIsApproving(false)
-                            
-                            setIsJoining(true)
                             await joinTokenGame(g.id)
-                            setIsJoining(false)
-
                             const started = await checkAndStartGame(updatedGame.id)
                             if (started) {
                               const opponent = updatedGame.players.find((p:any) => p.toLowerCase() !== address?.toLowerCase()) || ''
@@ -758,8 +742,6 @@ return () => clearInterval(timer)
 
                             alert('✅ Вы присоединились! Игра запустится, когда оба игрока онлайн.')
                           } catch (error) {
-                            setIsApproving(false)
-                            setIsJoining(false)
                             console.error('Ошибка присоединения:', error)
                             alert('❌ Ошибка присоединения к игре')
                           }
