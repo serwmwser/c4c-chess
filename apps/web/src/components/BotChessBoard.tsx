@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import $ from 'jquery'
 import 'chessboard/dist/chessboard-1.0.0.min.css'
-import { Chess } from 'chess.js'
+import Chess from 'chess.js'
 import { useChessTimer } from '@/hooks/useChessTimer'
 import ChessTimerDisplay from '@/components/ChessTimerDisplay'
 

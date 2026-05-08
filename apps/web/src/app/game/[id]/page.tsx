@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Chess } from 'chess.js'
+import Chess from 'chess.js'
 import { createNotification, formatC4C, formatPrizePool, formatTime, getLobbyGames } from '@/lib/config'
 
 const PIECES: Record<string, { w: string; b: string }> = {
