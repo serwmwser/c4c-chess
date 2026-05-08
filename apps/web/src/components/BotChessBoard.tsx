@@ -96,7 +96,6 @@ export default function BotChessBoard({ timeControl = 600, onGameEnd }: BotChess
   const onSnapEnd = () => {
     if (boardInstance.current && game) boardInstance.current.position(game.fen())
   }
-  }
 
   const updateStatus = () => {
     if (!game) return
