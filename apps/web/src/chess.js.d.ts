@@ -15,6 +15,8 @@ declare module 'chess.js' {
 
   export interface ChessInstance {
     move(move: string | { from: string; to: string; promotion?: string }, options?: any): Move | null
+    moves(options?: { verbose?: boolean }): string[]
+    moves(options: { verbose: true }): Move[]
     moves(options?: { verbose?: boolean }): string[] | Move[]
     in_checkmate(): boolean
     in_draw(): boolean
@@ -46,6 +48,8 @@ declare module 'chess.js' {
   export class Chess {
     constructor(fen?: string)
     move(move: string | { from: string; to: string; promotion?: string }, options?: any): Move | null
+    moves(options?: { verbose?: boolean }): string[]
+    moves(options: { verbose: true }): Move[]
     moves(options?: { verbose?: boolean }): string[] | Move[]
     in_checkmate(): boolean
     in_draw(): boolean
