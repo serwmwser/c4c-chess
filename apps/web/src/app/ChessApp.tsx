@@ -75,10 +75,13 @@ export default function ChessApp() {
   })
   const [notifications, setNotifications] = useState<GameNotification[]>([])
   const [notificationFilter, setNotificationFilter] = useState<'all' | 'unread'>('all')
+  const [false, setIsApproving] = useState(false)
+  const [false, setIsCreating] = useState(false)
+  const [false, setIsJoining] = useState(false)
 
-  const { approve, isPending: isApproving } = useApproveC4C()
-  const { create: createTokenGame, isPending: isCreating } = useCreateTokenGame()
-  const { join: joinTokenGame, isPending: isJoining } = useJoinTokenGame()
+  const { approve } = useApproveC4C()
+  const { create: createTokenGame } = useCreateTokenGame()
+  const { join: joinTokenGame } = useJoinTokenGame()
   
   
   useEffect(() => { if (FIXED_CSS) injectGlobalStyles(FIXED_CSS) }, [])
@@ -582,12 +585,13 @@ return () => clearInterval(timer)
                     startAt: 0
                   }
 
-                  if (!isApproving) {
-                    await approve(stake)
-                  }
-                  if (!isCreating) {
-                    await createTokenGame(timeCtrl, stake)
-                  }
+                  setIsApproving(true)
+                  await approve(stake)
+                  setIsApproving(false)
+                  
+                  setIsCreating(true)
+                  await createTokenGame(timeCtrl, stake)
+                  setIsCreating(false)
 
                   publishGameToLobby(gameData)
                   setGames(getLobbyGames())
@@ -608,20 +612,22 @@ return () => clearInterval(timer)
                   alert('✅ Игра создана и приглашение скопировано в буфер обмена!')
                   setTab('lobby')
                 } catch (error) {
+                  setIsApproving(false)
+                  setIsCreating(false)
                   console.error('Ошибка создания игры:', error)
                   alert('❌ Ошибка создания игры')
                 }
               }}
-              disabled={!balance || balance.value < BigInt(stake) || isApproving || isCreating}
+              disabled={!balance || balance.value < BigInt(stake) || false || false}
               style={{
                 width:'100%', 
                 padding:14, 
-                background: (!balance || balance.value < BigInt(stake) || isApproving || isCreating) ? '#6b7280' : 'var(--success)', 
+                background: (!balance || balance.value < BigInt(stake) || false || false) ? '#6b7280' : 'var(--success)', 
                 color:'#fff', 
                 borderRadius:8, 
                 fontWeight:600, 
                 border:'none', 
-                cursor: (!balance || balance.value < BigInt(stake) || isApproving || isCreating) ? 'not-allowed' : 'pointer',
+                cursor: (!balance || balance.value < BigInt(stake) || false || false) ? 'not-allowed' : 'pointer',
                 marginBottom: 12
               }}
             >
@@ -703,12 +709,13 @@ return () => clearInterval(timer)
                             })
                             setNotifications(getNotifications(notificationFilter))
 
-                            if (!isApproving) {
-                              await approve(g.stake)
-                            }
-                            if (!isJoining) {
-                              await joinTokenGame(g.id)
-                            }
+                            setIsApproving(true)
+                            await approve(g.stake)
+                            setIsApproving(false)
+                            
+                            setIsJoining(true)
+                            await joinTokenGame(g.id)
+                            setIsJoining(false)
 
                             const started = await checkAndStartGame(updatedGame.id)
                             if (started) {
@@ -741,6 +748,8 @@ return () => clearInterval(timer)
 
                             alert('✅ Вы присоединились! Игра запустится, когда оба игрока онлайн.')
                           } catch (error) {
+                            setIsApproving(false)
+                            setIsJoining(false)
                             console.error('Ошибка присоединения:', error)
                             alert('❌ Ошибка присоединения к игре')
                           }
